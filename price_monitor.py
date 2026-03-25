@@ -1,10 +1,18 @@
 import requests
 
-def get_price(coin="BTC"):
+def get_price(coin="bitcoin"):
     try:
-        url = f"https://api.binance.com/api/v3/ticker/price?symbol={coin}USDT"
-        response = requests.get(url, timeout=5)
+        coin_map = {
+            "btc": "bitcoin",
+            "eth": "ethereum",
+            "sol": "solana",
+            "xrp": "ripple",
+            "doge": "dogecoin",
+            "bnb": "binancecoin"
+        }
+        coin_id = coin_map.get(coin.lower(), coin.lower())
+        response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd", timeout=10)
         data = response.json()
-        return float(data['price'])
+        return float(data[coin_id]['usd'])
     except:
         return None
