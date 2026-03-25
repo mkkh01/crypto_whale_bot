@@ -36,8 +36,8 @@ def detect_category(text):
 
 def analyze_sentiment(text):
     text_lower = text.lower()
-    positive = ['surge', 'pump', 'bull', 'gain', 'up', 'positive', '新高', 'ارتفع']
-    negative = ['crash', 'dump', 'bear', 'down', 'loss', 'negative', 'هبط', 'انخفض']
+    positive = ['surge', 'pump', 'bull', 'gain', 'up', 'positive']
+    negative = ['crash', 'dump', 'bear', 'down', 'loss', 'negative']
     score = sum(1 for w in positive if w in text_lower) - sum(1 for w in negative if w in text_lower)
     if score > 0:
         return '🟢 إيجابي'
