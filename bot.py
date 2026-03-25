@@ -14,7 +14,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🐋 **بوت الحوت - النظام الاحترافي**\n\n"
         "📊 **الأوامر المتاحة:**\n"
-        "/latest - آخر الأخبار مع تحليل\n"
+        "/latest - آخر الأخبار مع تحليل (بالعربية)\n"
         "/signal - إشارة تداول فورية\n"
         "/price BTC - سعر البيتكوين\n"
         "/watchlist - أسعار العملات المفضلة\n\n"
@@ -30,7 +30,7 @@ async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     for news in news_list:
         analysis = analyze_news(news['title'])
-        text = f"📰 *{news['title']}*\n\n"
+        text = f"📰 *{analysis['title_ar']}*\n\n"
         text += f"🏷️ *التصنيف:* {analysis['category']}\n"
         text += f"📊 *المشاعر:* {analysis['sentiment']}\n"
         text += f"💰 *العملات:* {', '.join(analysis['coins'])}\n"
@@ -50,7 +50,7 @@ async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     analysis = analyze_news(news['title'])
     signal = generate_signal(analysis, news)
     text = f"🚨 **إشارة فورية**\n\n"
-    text += f"📰 {news['title']}\n"
+    text += f"📰 {analysis['title_ar']}\n"
     text += f"💰 العملات: {', '.join(analysis['coins'])}\n"
     text += f"🎯 {signal['action']} {signal['emoji']}\n"
     text += f"📊 الثقة: {signal['confidence']}%\n"
@@ -59,26 +59,49 @@ async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
-    coin = args[0].upper() if args else "BTC"
+    coin = args[0].lower() if args else "bitcoin"
+    
+    coin_map = {
+        "btc": "bitcoin",
+        "eth": "ethereum", 
+        "sol": "solana",
+        "xrp": "ripple",
+        "doge": "dogecoin",
+        "bnb": "binancecoin"
+    }
+    
+    coin_id = coin_map.get(coin, coin)
+    
     try:
-        response = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={coin}USDT")
+        response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd")
         data = response.json()
-        price = float(data['price'])
-        await update.message.reply_text(f"💰 **{coin}/USDT**\nالسعر: ${price:,.2f}", parse_mode='Markdown')
+        price = data[coin_id]['usd']
+        symbol = coin.upper()
+        await update.message.reply_text(f"💰 **{symbol}/USD**\nالسعر: ${price:,.2f}", parse_mode='Markdown')
     except:
-        await update.message.reply_text(f"❌ لم يتم العثور على {coin}")
+        await update.message.reply_text(f"❌ لم يتم العثور على {coin.upper()}")
 
 async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    watchlist_coins = ["BTC", "ETH", "SOL", "BNB"]
+    coins = {
+        "bitcoin": "BTC",
+        "ethereum": "ETH",
+        "solana": "SOL",
+        "binancecoin": "BNB",
+        "ripple": "XRP",
+        "dogecoin": "DOGE"
+    }
+    
     text = "📊 **قائمة المراقبة**\n\n"
-    for coin in watchlist_coins:
+    
+    for coin_id, symbol in coins.items():
         try:
-            response = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={coin}USDT")
+            response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd")
             data = response.json()
-            price = float(data['price'])
-            text += f"💰 {coin}: ${price:,.2f}\n"
+            price = data[coin_id]['usd']
+            text += f"💰 {symbol}: ${price:,.2f}\n"
         except:
-            text += f"❌ {coin}: غير متاح\n"
+            text += f"❌ {symbol}: غير متاح\n"
+    
     await update.message.reply_text(text, parse_mode='Markdown')
 
 async def auto_signals(context: ContextTypes.DEFAULT_TYPE):
@@ -89,7 +112,7 @@ async def auto_signals(context: ContextTypes.DEFAULT_TYPE):
             signal = generate_signal(analysis, news)
             if signal['confidence'] > 70:
                 text = f"🚨 **إشارة تداول عاجلة** 🚨\n\n"
-                text += f"📰 {news['title']}\n"
+                text += f"📰 {analysis['title_ar']}\n"
                 text += f"💰 العملات: {', '.join(analysis['coins'])}\n"
                 text += f"🎯 {signal['action']} {signal['emoji']}\n"
                 text += f"📊 الثقة: {signal['confidence']}%\n"
