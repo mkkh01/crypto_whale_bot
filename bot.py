@@ -1,12 +1,12 @@
 import os
 import asyncio
+import requests
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from news_fetcher import fetch_all_news
 from analyzer import analyze_news
 from signal_generator import generate_signal
 from storage import save_news, is_news_sent
-from price_monitor import get_price
 
 TOKEN = os.environ.get("BOT_TOKEN", "8715770007:AAGmDggZubTr6p1u9qJJX5QBgqPknmQBC44")
 
@@ -14,42 +14,72 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🐋 **بوت الحوت - النظام الاحترافي**\n\n"
         "📊 **الأوامر المتاحة:**\n"
-        "/latest - آخر 5 أخبار مع تحليل\n"
-        "/signal - إشارات تداول لحظية\n"
+        "/latest - آخر الأخبار مع تحليل\n"
+        "/signal - إشارة تداول فورية\n"
         "/price BTC - سعر البيتكوين\n"
-        "/watchlist - قائمة المراقبة\n\n"
-        "⚡ **الإشارات ترسل تلقائياً كل 15 دقيقة**",
+        "/watchlist - أسعار العملات المفضلة\n\n"
+        "⚡ **الإشارات تُرسل تلقائياً كل 15 دقيقة**",
         parse_mode='Markdown'
     )
 
 async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("🔍 جاري جلب وتحليل الأخبار...")
-    news_list = fetch_all_news(limit=5)
+    msg = await update.message.reply_text("🔍 جاري جلب الأخبار...")
+    news_list = fetch_all_news(limit=3)
     if not news_list:
-        await msg.edit_text("❌ لم يتم العثور على أخبار")
+        await msg.edit_text("❌ لا توجد أخبار حالياً")
         return
     for news in news_list:
         analysis = analyze_news(news['title'])
-        signal = generate_signal(analysis, news)
-        text = f"📰 **{news['title']}**\n\n"
-        text += f"🏷️ {analysis['category']} | {analysis['sentiment']}\n"
-        text += f"💰 العملات: {', '.join(analysis['coins'])}\n"
-        text += f"⭐ الأهمية: {analysis['importance']}/10\n"
-        text += f"🎯 **الإشارة:** {signal['action']} {signal['emoji']}\n"
-        text += f"📌 الثقة: {signal['confidence']}%\n"
-        text += f"🔗 [المصدر]({news['link']})"
+        text = f"📰 *{news['title']}*\n\n"
+        text += f"🏷️ *التصنيف:* {analysis['category']}\n"
+        text += f"📊 *المشاعر:* {analysis['sentiment']}\n"
+        text += f"💰 *العملات:* {', '.join(analysis['coins'])}\n"
+        text += f"⭐ *الأهمية:* {analysis['importance']}/10\n"
+        text += f"📌 *المصدر:* {news['source']}\n"
+        text += f"🔗 [رابط الخبر]({news['link']})"
         await update.message.reply_text(text, parse_mode='Markdown', disable_web_page_preview=True)
-        await asyncio.sleep(0.8)
+        await asyncio.sleep(0.5)
     await msg.delete()
+
+async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    news_list = fetch_all_news(limit=1)
+    if not news_list:
+        await update.message.reply_text("❌ لا توجد أخبار حالياً")
+        return
+    news = news_list[0]
+    analysis = analyze_news(news['title'])
+    signal = generate_signal(analysis, news)
+    text = f"🚨 **إشارة فورية**\n\n"
+    text += f"📰 {news['title']}\n"
+    text += f"💰 العملات: {', '.join(analysis['coins'])}\n"
+    text += f"🎯 {signal['action']} {signal['emoji']}\n"
+    text += f"📊 الثقة: {signal['confidence']}%\n"
+    text += f"💡 {signal['reason']}"
+    await update.message.reply_text(text, parse_mode='Markdown')
 
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     coin = args[0].upper() if args else "BTC"
-    price = get_price(coin)
-    if price:
-        await update.message.reply_text(f"💰 {coin}: ${price:,.2f}")
-    else:
+    try:
+        response = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={coin}USDT")
+        data = response.json()
+        price = float(data['price'])
+        await update.message.reply_text(f"💰 **{coin}/USDT**\nالسعر: ${price:,.2f}", parse_mode='Markdown')
+    except:
         await update.message.reply_text(f"❌ لم يتم العثور على {coin}")
+
+async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    watchlist_coins = ["BTC", "ETH", "SOL", "BNB"]
+    text = "📊 **قائمة المراقبة**\n\n"
+    for coin in watchlist_coins:
+        try:
+            response = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={coin}USDT")
+            data = response.json()
+            price = float(data['price'])
+            text += f"💰 {coin}: ${price:,.2f}\n"
+        except:
+            text += f"❌ {coin}: غير متاح\n"
+    await update.message.reply_text(text, parse_mode='Markdown')
 
 async def auto_signals(context: ContextTypes.DEFAULT_TYPE):
     news_list = fetch_all_news(limit=3)
@@ -60,6 +90,7 @@ async def auto_signals(context: ContextTypes.DEFAULT_TYPE):
             if signal['confidence'] > 70:
                 text = f"🚨 **إشارة تداول عاجلة** 🚨\n\n"
                 text += f"📰 {news['title']}\n"
+                text += f"💰 العملات: {', '.join(analysis['coins'])}\n"
                 text += f"🎯 {signal['action']} {signal['emoji']}\n"
                 text += f"📊 الثقة: {signal['confidence']}%\n"
                 text += f"💡 {signal['reason']}"
@@ -70,7 +101,9 @@ def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("latest", latest))
+    app.add_handler(CommandHandler("signal", signal_command))
     app.add_handler(CommandHandler("price", price_command))
+    app.add_handler(CommandHandler("watchlist", watchlist_command))
     
     if app.job_queue:
         app.job_queue.run_repeating(auto_signals, interval=900, first=10)
