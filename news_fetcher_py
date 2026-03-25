@@ -1,0 +1,59 @@
+import feedparser
+import hashlib
+import requests
+import os
+
+SOURCES = [
+    "https://cointelegraph.com/rss",
+    "https://decrypt.co/feed",
+    "https://cryptopotato.com/feed",
+    "https://bitcoinmagazine.com/.rss/full/",
+    "https://www.bloomberg.com/feed",
+    "https://www.reuters.com/rss",
+    "https://www.bbc.com/news",
+]
+
+CRYPTOPANIC_KEY = os.environ.get("CRYPTOPANIC_KEY", "")
+
+def fetch_rss():
+    news_list = []
+    for url in SOURCES:
+        try:
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:2]:
+                news_id = hashlib.md5(entry.link.encode()).hexdigest()
+                news_list.append({
+                    'id': news_id,
+                    'title': entry.title,
+                    'link': entry.link,
+                    'source': url.split('/')[2],
+                    'type': 'rss'
+                })
+        except:
+            pass
+    return news_list
+
+def fetch_cryptopanic():
+    if not CRYPTOPANIC_KEY:
+        return []
+    try:
+        url = f"https://cryptopanic.com/api/v1/posts/?auth_token={CRYPTOPANIC_KEY}&public=true"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        news_list = []
+        for item in data.get('results', [])[:3]:
+            news_id = hashlib.md5(item['url'].encode()).hexdigest()
+            news_list.append({
+                'id': news_id,
+                'title': item['title'],
+                'link': item['url'],
+                'source': 'cryptopanic.com',
+                'type': 'api'
+            })
+        return news_list
+    except:
+        return []
+
+def fetch_all_news(limit=8):
+    all_news = fetch_rss() + fetch_cryptopanic()
+    return all_news[:limit]
