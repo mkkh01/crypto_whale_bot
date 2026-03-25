@@ -59,45 +59,46 @@ async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
-    coin = args[0].lower() if args else "bitcoin"
+    coin = args[0].lower() if args else "btc"
     
+    # تسميات CoinPaprika
     coin_map = {
-        "btc": "bitcoin",
-        "eth": "ethereum", 
-        "sol": "solana",
-        "xrp": "ripple",
-        "doge": "dogecoin",
-        "bnb": "binancecoin"
+        "btc": "btc-bitcoin",
+        "eth": "eth-ethereum",
+        "sol": "sol-solana",
+        "xrp": "xrp-xrp",
+        "doge": "doge-dogecoin",
+        "bnb": "bnb-binance-coin"
     }
     
-    coin_id = coin_map.get(coin, coin)
+    coin_id = coin_map.get(coin, f"{coin}-{coin}")
     
     try:
-        response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd")
+        response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=10)
         data = response.json()
-        price = data[coin_id]['usd']
+        price = data['quotes']['USD']['price']
         symbol = coin.upper()
         await update.message.reply_text(f"💰 **{symbol}/USD**\nالسعر: ${price:,.2f}", parse_mode='Markdown')
-    except:
+    except Exception as e:
         await update.message.reply_text(f"❌ لم يتم العثور على {coin.upper()}")
 
 async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     coins = {
-        "bitcoin": "BTC",
-        "ethereum": "ETH",
-        "solana": "SOL",
-        "binancecoin": "BNB",
-        "ripple": "XRP",
-        "dogecoin": "DOGE"
+        "btc-bitcoin": "BTC",
+        "eth-ethereum": "ETH",
+        "sol-solana": "SOL",
+        "bnb-binance-coin": "BNB",
+        "xrp-xrp": "XRP",
+        "doge-dogecoin": "DOGE"
     }
     
     text = "📊 **قائمة المراقبة**\n\n"
     
     for coin_id, symbol in coins.items():
         try:
-            response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd")
+            response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=10)
             data = response.json()
-            price = data[coin_id]['usd']
+            price = data['quotes']['USD']['price']
             text += f"💰 {symbol}: ${price:,.2f}\n"
         except:
             text += f"❌ {symbol}: غير متاح\n"
