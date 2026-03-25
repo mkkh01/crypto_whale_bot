@@ -1,4 +1,22 @@
 import re
+import requests
+
+# دالة الترجمة
+def translate_to_arabic(text):
+    try:
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            'client': 'gtx',
+            'sl': 'en',
+            'tl': 'ar',
+            'dt': 't',
+            'q': text
+        }
+        response = requests.get(url, params=params, timeout=5)
+        result = response.json()
+        return result[0][0][0]
+    except:
+        return text
 
 COINS = {
     'BTC': ['bitcoin', 'btc'],
@@ -54,7 +72,12 @@ def get_importance(text):
     return min(score, 10)
 
 def analyze_news(title):
+    # ترجمة العنوان للعربية
+    title_ar = translate_to_arabic(title)
+    
     return {
+        'title_ar': title_ar,           # العنوان بالعربية
+        'title_en': title,               # العنوان الأصلي
         'coins': extract_coins(title),
         'category': detect_category(title),
         'sentiment': analyze_sentiment(title),
