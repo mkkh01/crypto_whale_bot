@@ -1,24 +1,32 @@
 import os
 import asyncio
 import requests
+import time
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from news_fetcher import fetch_all_news
 from analyzer import analyze_news
 from signal_generator import generate_signal
-from storage import save_news, is_news_sent
+from storage import load_sent, save_sent, is_news_sent, save_news
 
 TOKEN = os.environ.get("BOT_TOKEN", "8715770007:AAGmDggZubTr6p1u9qJJX5QBgqPknmQBC44")
+CHAT_ID = None
+
+# متغيرات لمنع التوقف
+last_check_time = 0
+check_count = 0
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global CHAT_ID
+    CHAT_ID = update.effective_chat.id
     await update.message.reply_text(
         "🐋 **بوت الحوت - النظام الاحترافي**\n\n"
         "📊 **الأوامر المتاحة:**\n"
-        "/latest - آخر الأخبار مع تحليل (بالعربية)\n"
+        "/latest - آخر الأخبار مع تحليل\n"
         "/signal - إشارة تداول فورية\n"
         "/price BTC - سعر البيتكوين\n"
         "/watchlist - أسعار العملات المفضلة\n\n"
-        "⚡ **الإشارات تُرسل تلقائياً كل 15 دقيقة**",
+        "⚡ **الإشارات تُرسل عند ظهور أخبار مهمة**",
         parse_mode='Markdown'
     )
 
@@ -61,7 +69,6 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     coin = args[0].lower() if args else "btc"
     
-    # تسميات CoinPaprika
     coin_map = {
         "btc": "btc-bitcoin",
         "eth": "eth-ethereum",
@@ -74,12 +81,12 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     coin_id = coin_map.get(coin, f"{coin}-{coin}")
     
     try:
-        response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=10)
+        response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=5)
         data = response.json()
         price = data['quotes']['USD']['price']
         symbol = coin.upper()
         await update.message.reply_text(f"💰 **{symbol}/USD**\nالسعر: ${price:,.2f}", parse_mode='Markdown')
-    except Exception as e:
+    except:
         await update.message.reply_text(f"❌ لم يتم العثور على {coin.upper()}")
 
 async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -88,15 +95,13 @@ async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "eth-ethereum": "ETH",
         "sol-solana": "SOL",
         "bnb-binance-coin": "BNB",
-        "xrp-xrp": "XRP",
-        "doge-dogecoin": "DOGE"
     }
     
     text = "📊 **قائمة المراقبة**\n\n"
     
     for coin_id, symbol in coins.items():
         try:
-            response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=10)
+            response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=5)
             data = response.json()
             price = data['quotes']['USD']['price']
             text += f"💰 {symbol}: ${price:,.2f}\n"
@@ -105,23 +110,63 @@ async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(text, parse_mode='Markdown')
 
-async def auto_signals(context: ContextTypes.DEFAULT_TYPE):
-    news_list = fetch_all_news(limit=3)
-    for news in news_list:
-        if not is_news_sent(news['id']):
-            analysis = analyze_news(news['title'])
-            signal = generate_signal(analysis, news)
-            if signal['confidence'] > 70:
-                text = f"🚨 **إشارة تداول عاجلة** 🚨\n\n"
-                text += f"📰 {analysis['title_ar']}\n"
-                text += f"💰 العملات: {', '.join(analysis['coins'])}\n"
-                text += f"🎯 {signal['action']} {signal['emoji']}\n"
-                text += f"📊 الثقة: {signal['confidence']}%\n"
-                text += f"💡 {signal['reason']}"
-                await context.bot.send_message(chat_id=os.environ.get("CHAT_ID"), text=text, parse_mode='Markdown')
-                save_news(news['id'])
+async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
+    """فحص الأخبار مع حماية من التوقف"""
+    global CHAT_ID, last_check_time, check_count
+    
+    if not CHAT_ID:
+        return
+    
+    # حماية: لا تفحص أكثر من مرة كل 15 ثانية
+    current_time = time.time()
+    if current_time - last_check_time < 15:
+        return
+    last_check_time = current_time
+    
+    # حماية: تجنب التحميل الزائد
+    check_count += 1
+    if check_count > 100:
+        check_count = 0
+        await asyncio.sleep(5)
+    
+    try:
+        # مهلة زمنية للجلب
+        news_list = await asyncio.wait_for(
+            asyncio.to_thread(fetch_all_news, 5),
+            timeout=10
+        )
+        
+        sent_ids = load_sent()
+        
+        for news in news_list:
+            if not is_news_sent(news['id']):
+                analysis = analyze_news(news['title'])
+                signal = generate_signal(analysis, news)
+                
+                # إرسال فقط الأخبار ذات الأهمية العالية
+                if analysis['importance'] >= 7 or signal['confidence'] > 70:
+                    text = f"🚨 **خبر عاجل** 🚨\n\n"
+                    text += f"📰 {analysis['title_ar']}\n"
+                    text += f"🏷️ {analysis['category']} | {analysis['sentiment']}\n"
+                    text += f"💰 العملات: {', '.join(analysis['coins'])}\n"
+                    text += f"⭐ الأهمية: {analysis['importance']}/10\n"
+                    text += f"🎯 **الإشارة:** {signal['action']} {signal['emoji']}\n"
+                    text += f"📊 الثقة: {signal['confidence']}%\n"
+                    text += f"💡 {signal['reason']}"
+                    
+                    await context.bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown', disable_web_page_preview=True)
+                    save_news(news['id'])
+                    await asyncio.sleep(2)
+    except asyncio.TimeoutError:
+        # إذا تأخر الجلب، نتجاهل هذه الدورة
+        pass
+    except Exception as e:
+        # تجاهل الأخطاء للحفاظ على استمرارية النظام
+        pass
 
 def main():
+    global CHAT_ID
+    
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("latest", latest))
@@ -129,10 +174,11 @@ def main():
     app.add_handler(CommandHandler("price", price_command))
     app.add_handler(CommandHandler("watchlist", watchlist_command))
     
+    # تحديث كل 30 ثانية (أقل ضغطاً على النظام)
     if app.job_queue:
-        app.job_queue.run_repeating(auto_signals, interval=900, first=10)
+        app.job_queue.run_repeating(check_news_urgent, interval=30, first=10)
     
-    print("🐋 بوت الحوت شغال...")
+    print("🐋 بوت الحوت شغال - تحديث محسن كل 30 ثانية...")
     app.run_polling()
 
 if __name__ == "__main__":
