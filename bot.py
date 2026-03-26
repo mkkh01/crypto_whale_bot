@@ -9,85 +9,68 @@ from analyzer import analyze_news, get_signal_explanation
 from signal_generator import generate_signal
 from storage import load_sent, save_sent, is_news_sent, save_news
 
-# ========== حل مشكلة المنفذ لـ Render ==========
+# ========== مكتبة الإبقاء على الحياة ==========
 from flask import Flask
 from threading import Thread
+from keep_alive_ping import create_service
 
+# خادم ويب وهمي لـ Render
 app_web = Flask('')
 
 @app_web.route('/')
 def home():
     return "🐋 Bot is running - Crypto Whale Bot"
 
+@app_web.route('/alive')
+def alive():
+    return "I am alive!"
+
 def run_web():
     port = int(os.environ.get('PORT', 10000))
     app_web.run(host='0.0.0.0', port=port)
 
-# تشغيل الخادم في خلفية منفصلة
+# تشغيل خادم الويب في الخلفية
 Thread(target=run_web).start()
+
+# تشغيل خدمة الإبقاء على الحياة (ترسل طلباً لنفسها كل دقيقة)
+try:
+    keep_alive = create_service(
+        ping_interval=60,  # كل 60 ثانية
+        ping_endpoint="alive"
+    )
+    print("✅ خدمة KeepAlive تعمل")
+except:
+    print("⚠️ KeepAlive لم يعمل، لكن البوت يستمر")
 # ===============================================
 
-TOKEN = os.environ.get("BOT_TOKEN", "8715770007:AAGmDggZubTr6p1u9qJJX5QBgqPknmQBC44")
+TOKEN = os.environ.get("BOT_TOKEN", "8715770007:AAGXV9GyGACyEeSEKGUTMNXwqaOZ14UQKcM")
 CHAT_ID = None
 
-# متغيرات لمنع التوقف
+# متغيرات للتحكم
 last_check_time = 0
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تسجيل معرف الدردشة وبدء الاستقبال التلقائي"""
     global CHAT_ID
     CHAT_ID = update.effective_chat.id
     await update.message.reply_text(
         "🐋 **بوت الحوت - النظام الاحترافي**\n\n"
-        "📊 **الأوامر المتاحة:**\n"
-        "/latest - آخر الأخبار مع تحليل (بالعربية)\n"
-        "/signal - إشارة تداول فورية\n"
+        "✅ **البوت يعمل الآن تلقائياً!**\n\n"
+        "📊 **سيتم إرسال الأخبار المهمة إليك فور ظهورها:**\n"
+        "• تحليل فوري للخبر\n"
+        "• تحديد العملات المتأثرة\n"
+        "• إشارة شراء/بيع/ترقب\n"
+        "• تفسير سبب الإشارة\n\n"
+        "⚡ **لا تحتاج لإرسال أي أوامر - الأخبار تصل تلقائياً كل 15 ثانية**\n\n"
+        "📌 **الأوامر المساعدة:**\n"
         "/price BTC - سعر البيتكوين\n"
-        "/watchlist - أسعار العملات المفضلة\n\n"
-        "⚡ **الإشارات تُرسل فوراً عند ظهور أخبار مهمة (تحديث كل 10 ثوانٍ)**",
+        "/watchlist - أسعار العملات المفضلة\n"
+        "/stop - إيقاف الإرسال التلقائي",
         parse_mode='Markdown'
     )
 
-async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("🔍 جاري جلب الأخبار...")
-    news_list = fetch_all_news(limit=5)
-    if not news_list:
-        await msg.edit_text("❌ لا توجد أخبار حالياً")
-        return
-    for news in news_list:
-        analysis = analyze_news(news['title'])
-        text = f"📰 *{analysis['title_ar']}*\n\n"
-        text += f"🏷️ *التصنيف:* {analysis['category']}\n"
-        text += f"📊 *المشاعر:* {analysis['sentiment']}\n"
-        text += f"💰 *العملات:* {', '.join(analysis['coins'])}\n"
-        text += f"⭐ *الأهمية:* {analysis['importance']}/10\n"
-        text += f"📌 *المصدر:* {news['source']}\n"
-        text += f"🔗 [رابط الخبر]({news['link']})"
-        await update.message.reply_text(text, parse_mode='Markdown', disable_web_page_preview=True)
-        await asyncio.sleep(0.5)
-    await msg.delete()
-
-async def signal_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    news_list = fetch_all_news(limit=1)
-    if not news_list:
-        await update.message.reply_text("❌ لا توجد أخبار حالياً")
-        return
-    news = news_list[0]
-    analysis = analyze_news(news['title'])
-    signal = generate_signal(analysis, news)
-    explanation = get_signal_explanation(signal, analysis)
-    
-    text = f"🚨 **إشارة فورية**\n\n"
-    text += f"📰 {analysis['title_ar']}\n"
-    text += f"💰 العملات: {', '.join(analysis['coins'])}\n"
-    text += f"🎯 {signal['action']} {signal['emoji']}\n"
-    text += f"📊 الثقة: {signal['confidence']}%\n"
-    text += f"💡 {signal['reason']}\n\n"
-    text += f"{explanation}\n\n"
-    text += f"🔗 [رابط الخبر]({news['link']})"
-    
-    await update.message.reply_text(text, parse_mode='Markdown', disable_web_page_preview=True)
-
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """سعر العملة"""
     args = context.args
     coin = args[0].lower() if args else "btc"
     
@@ -112,6 +95,7 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ لم يتم العثور على {coin.upper()}")
 
 async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قائمة المراقبة"""
     coins = {
         "btc-bitcoin": "BTC",
         "eth-ethereum": "ETH",
@@ -132,70 +116,92 @@ async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(text, parse_mode='Markdown')
 
+async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إيقاف الإرسال التلقائي مؤقتاً"""
+    global CHAT_ID
+    CHAT_ID = None
+    await update.message.reply_text(
+        "⏸️ **تم إيقاف الإرسال التلقائي**\n"
+        "لإعادة التشغيل، أرسل /start مرة أخرى",
+        parse_mode='Markdown'
+    )
+
 async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
-    """فحص الأخبار كل 10 ثوانٍ وإرسال الأخبار المهمة فوراً مع تفسير"""
+    """
+    فحص الأخبار وإرسالها تلقائياً كل 15 ثانية
+    يرسل كل الأخبار الجديدة (بدون فلترة)
+    """
     global CHAT_ID, last_check_time
     
     if not CHAT_ID:
         return
     
+    # منع التكرار السريع جداً
     current_time = time.time()
-    if current_time - last_check_time < 5:
+    if current_time - last_check_time < 10:
         return
     last_check_time = current_time
     
     try:
+        # جلب 10 أخبار
         news_list = await asyncio.wait_for(
-            asyncio.to_thread(fetch_all_news, 8),
-            timeout=12
+            asyncio.to_thread(fetch_all_news, 10),
+            timeout=15
         )
         
         sent_ids = load_sent()
+        new_count = 0
         
         for news in news_list:
             if not is_news_sent(news['id']):
                 analysis = analyze_news(news['title'])
                 signal = generate_signal(analysis, news)
+                explanation = get_signal_explanation(signal, analysis)
                 
-                # إرسال الأخبار ذات أهمية 3 أو أكثر
-                if analysis['importance'] >= 3:
-                    explanation = get_signal_explanation(signal, analysis)
-                    
-                    text = f"🚨 **خبر عاجل - تأثير على السوق** 🚨\n\n"
-                    text += f"📰 {analysis['title_ar']}\n"
-                    text += f"🏷️ {analysis['category']} | {analysis['sentiment']}\n"
-                    text += f"💰 **العملات المتأثرة:** {', '.join(analysis['coins'])}\n"
-                    text += f"⭐ **الأهمية:** {analysis['importance']}/10\n"
-                    text += f"🎯 **الإشارة:** {signal['action']} {signal['emoji']}\n"
-                    text += f"📊 **الثقة:** {signal['confidence']}%\n"
-                    text += f"💡 {signal['reason']}\n\n"
-                    text += f"{explanation}\n\n"
-                    text += f"🔗 [رابط الخبر]({news['link']})"
-                    
-                    await context.bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown', disable_web_page_preview=True)
-                    save_news(news['id'])
-                    await asyncio.sleep(1)
-                    
+                # إرسال الخبر (كل الأخبار الجديدة)
+                text = f"🚨 **خبر جديد** 🚨\n\n"
+                text += f"📰 {analysis['title_ar']}\n"
+                text += f"🏷️ {analysis['category']} | {analysis['sentiment']}\n"
+                text += f"💰 **العملات المتأثرة:** {', '.join(analysis['coins'])}\n"
+                text += f"⭐ **الأهمية:** {analysis['importance']}/10\n"
+                text += f"🎯 **الإشارة:** {signal['action']} {signal['emoji']}\n"
+                text += f"📊 **الثقة:** {signal['confidence']}%\n"
+                text += f"💡 {signal['reason']}\n\n"
+                text += f"{explanation}\n\n"
+                text += f"📌 **المصدر:** {news['source']}\n"
+                text += f"🔗 [رابط الخبر]({news['link']})"
+                
+                await context.bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown', disable_web_page_preview=True)
+                save_news(news['id'])
+                new_count += 1
+                await asyncio.sleep(1)  # تأخير بين الإرسال لتجنب الـ Rate Limit
+        
+        # تسجيل في Logs
+        if new_count > 0:
+            print(f"📨 [{time.strftime('%H:%M:%S')}] تم إرسال {new_count} أخبار جديدة")
+            
     except asyncio.TimeoutError:
-        pass
+        print(f"⏰ [{time.strftime('%H:%M:%S')}] Timeout في جلب الأخبار")
     except Exception as e:
-        print(f"خطأ: {e}")
+        print(f"⚠️ [{time.strftime('%H:%M:%S')}] خطأ: {e}")
 
 def main():
     global CHAT_ID
     
     app = Application.builder().token(TOKEN).build()
+    
+    # الأوامر المساعدة فقط (بدون latest و signal)
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("latest", latest))
-    app.add_handler(CommandHandler("signal", signal_command))
     app.add_handler(CommandHandler("price", price_command))
     app.add_handler(CommandHandler("watchlist", watchlist_command))
+    app.add_handler(CommandHandler("stop", stop_command))
     
-    # تحديث كل 10 ثوانٍ (أسرع استجابة للأخبار المهمة)
+    # تحديث كل 15 ثانية (إرسال تلقائي مستمر)
     if app.job_queue:
-        app.job_queue.run_repeating(check_news_urgent, interval=10, first=5)
+        app.job_queue.run_repeating(check_news_urgent, interval=15, first=5)
     
-    print("🐋 بوت الحوت شغال - جلب وإرسال تلقائي كل 10 ثوانٍ...")
+    print("🐋 بوت الحوت شغال - إرسال تلقائي كل 15 ثانية...")
+    print("✅ خدمة KeepAlive تعمل - السيرفر لن يتوقف")
     app.run_polling()
 
 if __name__ == "__main__":
