@@ -1,25 +1,23 @@
 import feedparser
 import hashlib
 
+# مصادر بديلة تعمل من أي مكان
 SOURCES = [
-    "https://cointelegraph.com/rss",
-    "https://decrypt.co/feed",
-    "https://cryptopotato.com/feed",
-    "https://www.newsbtc.com/feed/",
     "https://cryptoslate.com/feed/",
+    "https://www.newsbtc.com/feed/",
 ]
 
-def fetch_news(limit=8):
+def fetch_news(limit=5):
     """
-    جلب الأخبار من 5 مصادر
+    جلب الأخبار من مصادر بديلة
     """
     news_list = []
     
     for url in SOURCES:
         try:
-            feed = feedparser.parse(url, timeout=10)
+            feed = feedparser.parse(url, timeout=15)
             
-            for entry in feed.entries[:4]:  # 4 أخبار من كل مصدر
+            for entry in feed.entries[:5]:
                 news_id = hashlib.md5(entry.link.encode()).hexdigest()
                 news_list.append({
                     'id': news_id,
