@@ -41,9 +41,13 @@ last_check_time = 0
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global CHAT_ID
     CHAT_ID = update.effective_chat.id
+    # تسجيل في Logs للتأكد
+    print(f"✅ تم تسجيل CHAT_ID: {CHAT_ID}")
+    
     await update.message.reply_text(
         "🐋 **بوت الحوت - النظام الاحترافي**\n\n"
         "✅ **البوت يعمل الآن تلقائياً!**\n\n"
+        f"📱 **تم تسجيل معرف الدردشة:** `{CHAT_ID}`\n\n"
         "📊 **سيتم إرسال الأخبار المهمة إليك فور ظهورها:**\n"
         "• تحليل فوري للخبر\n"
         "• تحديد العملات المتأثرة\n"
@@ -125,6 +129,7 @@ async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global CHAT_ID
     CHAT_ID = None
+    print(f"⏸️ تم إيقاف الإرسال التلقائي بواسطة المستخدم")
     await update.message.reply_text(
         "⏸️ **تم إيقاف الإرسال التلقائي**\n"
         "لإعادة التشغيل، أرسل /start مرة أخرى",
@@ -132,9 +137,14 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
+    """
+    فحص الأخبار وإرسالها تلقائياً كل 15 ثانية
+    """
     global CHAT_ID, last_check_time
     
     if not CHAT_ID:
+        # سجل في Logs أن CHAT_ID غير موجود
+        print(f"⚠️ [{time.strftime('%H:%M:%S')}] CHAT_ID = None, لن يتم إرسال الأخبار")
         return
     
     current_time = time.time()
@@ -143,10 +153,15 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
     last_check_time = current_time
     
     try:
+        # جلب الأخبار
         news_list = await asyncio.wait_for(
             asyncio.to_thread(fetch_all_news, 10),
             timeout=15
         )
+        
+        if not news_list:
+            print(f"📭 [{time.strftime('%H:%M:%S')}] لا توجد أخبار جديدة")
+            return
         
         sent_ids = load_sent()
         new_count = 0
@@ -175,10 +190,12 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
                 await asyncio.sleep(1)
         
         if new_count > 0:
-            print(f"📨 [{time.strftime('%H:%M:%S')}] تم إرسال {new_count} أخبار جديدة")
+            print(f"📨 [{time.strftime('%H:%M:%S')}] تم إرسال {new_count} أخبار جديدة إلى {CHAT_ID}")
+        else:
+            print(f"🔍 [{time.strftime('%H:%M:%S')}] تم فحص {len(news_list)} خبر، لا جديد")
             
     except asyncio.TimeoutError:
-        print(f"⏰ [{time.strftime('%H:%M:%S')}] Timeout")
+        print(f"⏰ [{time.strftime('%H:%M:%S')}] Timeout في جلب الأخبار")
     except Exception as e:
         print(f"⚠️ [{time.strftime('%H:%M:%S')}] خطأ: {e}")
 
@@ -192,11 +209,13 @@ def main():
     app.add_handler(CommandHandler("reset", reset_command))
     app.add_handler(CommandHandler("stop", stop_command))
     
+    # تحديث كل 15 ثانية
     if app.job_queue:
         app.job_queue.run_repeating(check_news_urgent, interval=15, first=5)
     
     print("🐋 بوت الحوت شغال - إرسال تلقائي كل 15 ثانية...")
-    print("✅ خادم الويب شغال - السيرفر لن يتوقف")
+    print("✅ خادم الويب شغال على المنفذ 10000")
+    print("📱 انتظر إرسال /start لتسجيل معرف الدردشة")
     app.run_polling()
 
 if __name__ == "__main__":
