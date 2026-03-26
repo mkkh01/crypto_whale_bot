@@ -9,6 +9,24 @@ from analyzer import analyze_news, get_signal_explanation
 from signal_generator import generate_signal
 from storage import load_sent, save_sent, is_news_sent, save_news
 
+# ========== حل مشكلة المنفذ لـ Render ==========
+from flask import Flask
+from threading import Thread
+
+app_web = Flask('')
+
+@app_web.route('/')
+def home():
+    return "🐋 Bot is running - Crypto Whale Bot"
+
+def run_web():
+    port = int(os.environ.get('PORT', 10000))
+    app_web.run(host='0.0.0.0', port=port)
+
+# تشغيل الخادم في خلفية منفصلة
+Thread(target=run_web).start()
+# ===============================================
+
 TOKEN = os.environ.get("BOT_TOKEN", "8715770007:AAGmDggZubTr6p1u9qJJX5QBgqPknmQBC44")
 CHAT_ID = None
 
