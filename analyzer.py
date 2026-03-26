@@ -31,10 +31,9 @@ CATEGORIES = {
     '💰 اقتصادي': ['fed', 'inflation', 'rate', 'dollar', 'recession', 'economy', 'interest', 'jobs'],
     '🔒 أمني': ['hack', 'breach', 'scam', 'theft', 'exploit', 'vulnerability'],
     '📡 تقني': ['upgrade', 'network', 'protocol', 'layer2', 'mainnet', 'launch'],
-    '🌍 جيوسياسي': ['war', 'iran', 'russia', 'china', 'sanctions', 'attack', 'crisis']
+    '🌍 جيوسياسي': ['war', 'iran', 'russia', 'china', 'sanctions', 'attack', 'crisis', 'conflict']
 }
 
-# نظام تقييم متطور
 IMPACT_WORDS = {
     'catastrophic': ['war', 'nuclear', 'collapse', 'emergency', 'bank run', 'default'],
     'very_high': ['sec', 'fed', 'lawsuit', 'hack', 'ban', 'critical'],
@@ -63,8 +62,8 @@ def detect_category(text):
 
 def analyze_sentiment(text):
     text_lower = text.lower()
-    positive = ['surge', 'pump', 'bull', 'gain', 'up', 'positive', '新高', 'ارتفع', 'soar', 'rally']
-    negative = ['crash', 'dump', 'bear', 'down', 'loss', 'negative', 'هبط', 'انخفض', 'plunge', 'slump']
+    positive = ['surge', 'pump', 'bull', 'gain', 'up', 'positive', 'soar', 'rally', '新高', 'ارتفع']
+    negative = ['crash', 'dump', 'bear', 'down', 'loss', 'negative', 'plunge', 'slump', 'هبط', 'انخفض']
     score = sum(1 for w in positive if w in text_lower) - sum(1 for w in negative if w in text_lower)
     if score > 0:
         return '🟢 إيجابي'
@@ -73,39 +72,63 @@ def analyze_sentiment(text):
     return '⚪ محايد'
 
 def get_importance(text):
-    """
-    حساب أهمية الخبر من 1 إلى 10
-    """
     text_lower = text.lower()
-    score = 3  # أساس أقل لظهور المزيد من الأخبار
+    score = 3
     
-    # كلمات كارثية
     for word in IMPACT_WORDS['catastrophic']:
         if word in text_lower:
             score += 5
-    
-    # كلمات عالية جداً
     for word in IMPACT_WORDS['very_high']:
         if word in text_lower:
             score += 4
-    
-    # كلمات عالية
     for word in IMPACT_WORDS['high']:
         if word in text_lower:
             score += 3
-    
-    # كلمات متوسطة
     for word in IMPACT_WORDS['medium']:
         if word in text_lower:
             score += 2
-    
-    # كلمات منخفضة
     for word in IMPACT_WORDS['low']:
         if word in text_lower:
             score += 1
     
-    # حد أقصى 10
     return min(score, 10)
+
+def get_signal_explanation(signal, analysis):
+    """
+    إرجاع تفسير مفصل للإشارة
+    """
+    action = signal['action']
+    sentiment = analysis['sentiment']
+    category = analysis['category']
+    coins = ', '.join(analysis['coins'])
+    importance = analysis['importance']
+    
+    if 'بيع' in action:
+        return (f"🔻 **لماذا نبيع/نتجنب؟**\n\n"
+                f"• الخبر {sentiment} في مجال {category}\n"
+                f"• التأثير المتوقع: {importance}/10 (قوي)\n"
+                f"• العملات المتأثرة: {coins}\n\n"
+                f"📌 **التوصية:** تقليل المراكز في {coins}، وضع أوامر وقف خسارة، تجنب الدخول بصفقات شراء جديدة حتى يتضح الموقف.")
+    
+    elif 'شراء' in action:
+        return (f"🟢 **لماذا نشتري؟**\n\n"
+                f"• الخبر {sentiment} في مجال {category}\n"
+                f"• التأثير المتوقع: {importance}/10 (قوي)\n"
+                f"• العملات المتأثرة: {coins}\n\n"
+                f"📌 **التوصية:** فرصة شراء محتملة، انتظر تأكيد السعر ثم دخول تدريجي، حدد وقف خسارة 3-5%.")
+    
+    elif 'ترقب' in action:
+        return (f"🟡 **لماذا نترقب؟**\n\n"
+                f"• الخبر {sentiment} في مجال {category}\n"
+                f"• التأثير المتوقع: {importance}/10 (متوسط)\n"
+                f"• العملات المتأثرة: {coins}\n\n"
+                f"📌 **التوصية:** راقب السعر خلال الساعات القادمة، لا تدخل صفقات جديدة، انتظر تأكيد الاتجاه.")
+    
+    else:
+        return (f"⚪ **لماذا نراقب فقط؟**\n\n"
+                f"• الخبر {sentiment} في مجال {category}\n"
+                f"• التأثير المتوقع: {importance}/10 (ضعيف)\n\n"
+                f"📌 **التوصية:** لا تأثير فوري، استمر في مراقبة السوق بشكل عام.")
 
 def analyze_news(title):
     title_ar = translate_to_arabic(title)
@@ -116,6 +139,5 @@ def analyze_news(title):
         'coins': extract_coins(title),
         'category': detect_category(title),
         'sentiment': analyze_sentiment(title),
-        'importance': get_importance(title)  # الآن من 3 إلى 10
+        'importance': get_importance(title)
     }
-    
