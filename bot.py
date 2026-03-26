@@ -9,12 +9,10 @@ from analyzer import analyze_news, get_signal_explanation
 from signal_generator import generate_signal
 from storage import load_sent, save_sent, is_news_sent, save_news
 
-# ========== مكتبة الإبقاء على الحياة ==========
+# ========== خادم ويب بسيط لـ Render ==========
 from flask import Flask
 from threading import Thread
-from keep_alive_ping import create_service
 
-# خادم ويب وهمي لـ Render
 app_web = Flask('')
 
 @app_web.route('/')
@@ -31,16 +29,7 @@ def run_web():
 
 # تشغيل خادم الويب في الخلفية
 Thread(target=run_web).start()
-
-# تشغيل خدمة الإبقاء على الحياة (ترسل طلباً لنفسها كل دقيقة)
-try:
-    keep_alive = create_service(
-        ping_interval=60,  # كل 60 ثانية
-        ping_endpoint="alive"
-    )
-    print("✅ خدمة KeepAlive تعمل")
-except:
-    print("⚠️ KeepAlive لم يعمل، لكن البوت يستمر")
+print("✅ خادم الويب شغال على المنفذ 10000")
 # ===============================================
 
 TOKEN = os.environ.get("BOT_TOKEN", "8715770007:AAGXV9GyGACyEeSEKGUTMNXwqaOZ14UQKcM")
@@ -50,7 +39,6 @@ CHAT_ID = None
 last_check_time = 0
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تسجيل معرف الدردشة وبدء الاستقبال التلقائي"""
     global CHAT_ID
     CHAT_ID = update.effective_chat.id
     await update.message.reply_text(
@@ -70,7 +58,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """سعر العملة"""
     args = context.args
     coin = args[0].lower() if args else "btc"
     
@@ -95,7 +82,6 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ لم يتم العثور على {coin.upper()}")
 
 async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """قائمة المراقبة"""
     coins = {
         "btc-bitcoin": "BTC",
         "eth-ethereum": "ETH",
@@ -117,7 +103,6 @@ async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode='Markdown')
 
 async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إيقاف الإرسال التلقائي مؤقتاً"""
     global CHAT_ID
     CHAT_ID = None
     await update.message.reply_text(
@@ -127,23 +112,17 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
-    """
-    فحص الأخبار وإرسالها تلقائياً كل 15 ثانية
-    يرسل كل الأخبار الجديدة (بدون فلترة)
-    """
     global CHAT_ID, last_check_time
     
     if not CHAT_ID:
         return
     
-    # منع التكرار السريع جداً
     current_time = time.time()
     if current_time - last_check_time < 10:
         return
     last_check_time = current_time
     
     try:
-        # جلب 10 أخبار
         news_list = await asyncio.wait_for(
             asyncio.to_thread(fetch_all_news, 10),
             timeout=15
@@ -158,7 +137,6 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
                 signal = generate_signal(analysis, news)
                 explanation = get_signal_explanation(signal, analysis)
                 
-                # إرسال الخبر (كل الأخبار الجديدة)
                 text = f"🚨 **خبر جديد** 🚨\n\n"
                 text += f"📰 {analysis['title_ar']}\n"
                 text += f"🏷️ {analysis['category']} | {analysis['sentiment']}\n"
@@ -174,14 +152,13 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown', disable_web_page_preview=True)
                 save_news(news['id'])
                 new_count += 1
-                await asyncio.sleep(1)  # تأخير بين الإرسال لتجنب الـ Rate Limit
+                await asyncio.sleep(1)
         
-        # تسجيل في Logs
         if new_count > 0:
             print(f"📨 [{time.strftime('%H:%M:%S')}] تم إرسال {new_count} أخبار جديدة")
             
     except asyncio.TimeoutError:
-        print(f"⏰ [{time.strftime('%H:%M:%S')}] Timeout في جلب الأخبار")
+        print(f"⏰ [{time.strftime('%H:%M:%S')}] Timeout")
     except Exception as e:
         print(f"⚠️ [{time.strftime('%H:%M:%S')}] خطأ: {e}")
 
@@ -189,19 +166,16 @@ def main():
     global CHAT_ID
     
     app = Application.builder().token(TOKEN).build()
-    
-    # الأوامر المساعدة فقط (بدون latest و signal)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("price", price_command))
     app.add_handler(CommandHandler("watchlist", watchlist_command))
     app.add_handler(CommandHandler("stop", stop_command))
     
-    # تحديث كل 15 ثانية (إرسال تلقائي مستمر)
     if app.job_queue:
         app.job_queue.run_repeating(check_news_urgent, interval=15, first=5)
     
     print("🐋 بوت الحوت شغال - إرسال تلقائي كل 15 ثانية...")
-    print("✅ خدمة KeepAlive تعمل - السيرفر لن يتوقف")
+    print("✅ خادم الويب شغال - السيرفر لن يتوقف")
     app.run_polling()
 
 if __name__ == "__main__":
