@@ -27,6 +27,10 @@ def extract_coins(text):
         coins.append('SOL')
     if 'binance' in text_lower or 'bnb' in text_lower:
         coins.append('BNB')
+    if 'xrp' in text_lower or 'ripple' in text_lower:
+        coins.append('XRP')
+    if 'dogecoin' in text_lower or 'doge' in text_lower:
+        coins.append('DOGE')
     return coins if coins else ['عام']
 
 def detect_category(text):
@@ -37,14 +41,14 @@ def detect_category(text):
         return '💰 اقتصادي'
     if 'hack' in text_lower or 'breach' in text_lower or 'scam' in text_lower:
         return '🔒 أمني'
-    if 'upgrade' in text_lower or 'network' in text_lower:
+    if 'upgrade' in text_lower or 'network' in text_lower or 'launch' in text_lower:
         return '📡 تقني'
     return '🌐 عام'
 
 def analyze_sentiment(text):
     text_lower = text.lower()
-    positive = ['surge', 'pump', 'bull', 'gain', 'up', 'positive', 'rally']
-    negative = ['crash', 'dump', 'bear', 'down', 'loss', 'negative', 'plunge']
+    positive = ['surge', 'pump', 'bull', 'gain', 'up', 'positive', 'rally', 'soar']
+    negative = ['crash', 'dump', 'bear', 'down', 'loss', 'negative', 'plunge', 'slump']
     score = sum(1 for w in positive if w in text_lower) - sum(1 for w in negative if w in text_lower)
     if score > 0:
         return '🟢 إيجابي'
@@ -54,7 +58,7 @@ def analyze_sentiment(text):
 
 def get_importance(text):
     score = 5
-    high_impact = ['sec', 'fed', 'hack', 'lawsuit', 'emergency', 'breaking']
+    high_impact = ['sec', 'fed', 'hack', 'lawsuit', 'emergency', 'breaking', 'crash', 'surge']
     for w in high_impact:
         if w in text.lower():
             score += 2
@@ -66,21 +70,22 @@ def get_signal_explanation(signal, analysis):
     importance = analysis['importance']
     
     if 'بيع' in action:
-        return (f"🔻 **لماذا؟**\n"
+        return (f"🔻 **لماذا نبيع/نتجنب؟**\n\n"
                 f"• خبر سلبي بأهمية {importance}/10\n"
                 f"• العملات المتأثرة: {coins}\n\n"
-                f"📌 قلل المراكز، ضع أوامر وقف خسارة.")
+                f"📌 **التوصية:** تقليل المراكز، وضع أوامر وقف خسارة.")
     elif 'شراء' in action:
-        return (f"🟢 **لماذا؟**\n"
+        return (f"🟢 **لماذا نشتري؟**\n\n"
                 f"• خبر إيجابي بأهمية {importance}/10\n"
                 f"• العملات المتأثرة: {coins}\n\n"
-                f"📌 فرصة شراء، انتظر تأكيد السعر.")
+                f"📌 **التوصية:** فرصة شراء محتملة، انتظر تأكيد السعر.")
     elif 'ترقب' in action:
-        return (f"🟡 **لماذا؟**\n"
+        return (f"🟡 **لماذا نترقب؟**\n\n"
                 f"• خبر متوسط الأهمية {importance}/10\n"
-                f"• راقب السعر خلال الساعات القادمة.")
+                f"• العملات المتأثرة: {coins}\n\n"
+                f"📌 **التوصية:** راقب السعر خلال الساعات القادمة.")
     else:
-        return (f"⚪ **لماذا؟**\n"
+        return (f"⚪ **لماذا نراقب فقط؟**\n\n"
                 f"• خبر ضعيف الأهمية {importance}/10\n"
                 f"• لا تأثير فوري، استمر بالمراقبة.")
 
