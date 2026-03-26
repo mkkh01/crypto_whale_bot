@@ -1,7 +1,7 @@
 import hashlib
 import random
 
-def fetch_news(limit=5):
+def fetch_news(limit=2):
     test_news = [
         {
             'id': '1',
