@@ -1,40 +1,63 @@
-import feedparser
 import hashlib
-
-# مصادر بديلة تعمل من أي مكان
-SOURCES = [
-    "https://cryptoslate.com/feed/",
-    "https://www.newsbtc.com/feed/",
-]
+import random
 
 def fetch_news(limit=5):
     """
-    جلب الأخبار من مصادر بديلة
+    أخبار تجريبية متنوعة مع تصنيفات مختلفة
     """
-    news_list = []
+    test_news = [
+        {
+            'id': '1',
+            'title': '🚨 BREAKING: SEC Files Lawsuit Against Binance, BNB Drops 8%',
+            'link': 'https://cointelegraph.com/news/sec-sues-binance',
+            'source': 'cointelegraph.com'
+        },
+        {
+            'id': '2',
+            'title': '💰 Bitcoin Surges to $73,000 as ETF Inflows Hit Record $1.2B',
+            'link': 'https://cointelegraph.com/news/bitcoin-etf-record',
+            'source': 'cointelegraph.com'
+        },
+        {
+            'id': '3',
+            'title': '🏦 Federal Reserve Signals Rate Cuts in September, Crypto Markets Rally',
+            'link': 'https://reuters.com/fed-rate-cuts',
+            'source': 'reuters.com'
+        },
+        {
+            'id': '4',
+            'title': '🔒 Major Exchange Hack: $200 Million in ETH Stolen from Hot Wallet',
+            'link': 'https://thehackernews.com/crypto-hack',
+            'source': 'thehackernews.com'
+        },
+        {
+            'id': '5',
+            'title': '📈 Ethereum ETF Approval Expected Next Week, Analysts Predict 30% Rally',
+            'link': 'https://decrypt.co/ethereum-etf-approval',
+            'source': 'decrypt.co'
+        },
+        {
+            'id': '6',
+            'title': '⚡ Solana Network Suffers 4-Hour Outage, SOL Drops 5%',
+            'link': 'https://cryptoslate.com/solana-outage',
+            'source': 'cryptoslate.com'
+        },
+        {
+            'id': '7',
+            'title': '🇺🇸 Trump Announces Pro-Crypto Policy, Bitcoin Jumps 3%',
+            'link': 'https://politico.com/trump-crypto',
+            'source': 'politico.com'
+        },
+        {
+            'id': '8',
+            'title': '📊 MicroStrategy Buys Another 10,000 BTC, Total Holdings Reach 200,000',
+            'link': 'https://newsbtc.com/microstrategy-btc',
+            'source': 'newsbtc.com'
+        }
+    ]
     
-    for url in SOURCES:
-        try:
-            feed = feedparser.parse(url, timeout=15)
-            
-            for entry in feed.entries[:5]:
-                news_id = hashlib.md5(entry.link.encode()).hexdigest()
-                news_list.append({
-                    'id': news_id,
-                    'title': entry.title,
-                    'link': entry.link,
-                    'source': url.split('/')[2]
-                })
-        except Exception as e:
-            print(f"خطأ في {url}: {e}")
-            continue
-    
-    # إزالة التكرارات
-    unique = {}
-    for news in news_list:
-        if news['id'] not in unique:
-            unique[news['id']] = news
-    
-    return list(unique.values())[:limit]
+    # خلط الأخبار عشوائياً
+    random.shuffle(test_news)
+    return test_news[:limit]
 
 fetch_all_news = fetch_news
