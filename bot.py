@@ -55,7 +55,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/price BTC - سعر البيتكوين\n"
         "/watchlist - أسعار العملات المفضلة\n"
         "/reset - مسح ذاكرة الأخبار المرسلة\n"
-        "/stop - إيقاف الإرسال التلقائي",
+        "/stop - إيقاف الإرسال التلقائي\n"
+        "/force - إرسال خبر فوري (للتجربة)",
         parse_mode='Markdown'
     )
     
@@ -71,9 +72,49 @@ async def test_news(context: ContextTypes.DEFAULT_TYPE):
     
     text = "🧪 **خبر تجريبي - البوت يعمل!**\n\n"
     text += "✅ إذا وصلتك هذه الرسالة، البوت يعمل بشكل صحيح.\n"
-    text += "⚡ ستصل الأخبار الحقيقية خلال 15 ثانية."
+    text += "⚡ ستصل الأخبار الحقيقية خلال 15 ثانية.\n"
+    text += "📌 إذا لم تصل أخبار، استخدم /force"
     
     await context.bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown')
+
+async def force_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إرسال خبر فوري للتأكد من عمل جلب الأخبار"""
+    global CHAT_ID
+    CHAT_ID = update.effective_chat.id
+    
+    msg = await update.message.reply_text("🔍 جاري جلب خبر فوري...")
+    
+    try:
+        news_list = fetch_all_news(3)
+        
+        if not news_list:
+            await msg.edit_text("❌ لا توجد أخبار حالياً")
+            return
+        
+        await msg.delete()
+        
+        for news in news_list[:2]:
+            analysis = analyze_news(news['title'])
+            signal = generate_signal(analysis, news)
+            explanation = get_signal_explanation(signal, analysis)
+            
+            text = f"🚨 **خبر فوري** 🚨\n\n"
+            text += f"📰 {analysis['title_ar']}\n"
+            text += f"🏷️ {analysis['category']} | {analysis['sentiment']}\n"
+            text += f"💰 **العملات:** {', '.join(analysis['coins'])}\n"
+            text += f"⭐ **الأهمية:** {analysis['importance']}/10\n"
+            text += f"🎯 **الإشارة:** {signal['action']} {signal['emoji']}\n"
+            text += f"📊 **الثقة:** {signal['confidence']}%\n"
+            text += f"💡 {signal['reason']}\n\n"
+            text += f"{explanation}\n\n"
+            text += f"📌 **المصدر:** {news['source']}\n"
+            text += f"🔗 [رابط الخبر]({news['link']})"
+            
+            await update.message.reply_text(text, parse_mode='Markdown', disable_web_page_preview=True)
+            await asyncio.sleep(1)
+            
+    except Exception as e:
+        await msg.edit_text(f"❌ خطأ: {e}")
 
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
@@ -210,6 +251,7 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("force", force_news))
     app.add_handler(CommandHandler("price", price_command))
     app.add_handler(CommandHandler("watchlist", watchlist_command))
     app.add_handler(CommandHandler("reset", reset_command))
