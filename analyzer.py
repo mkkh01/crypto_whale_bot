@@ -1,7 +1,6 @@
 import re
 import requests
 
-# دالة الترجمة
 def translate_to_arabic(text):
     try:
         url = "https://translate.googleapis.com/translate_a/single"
@@ -28,10 +27,20 @@ COINS = {
 }
 
 CATEGORIES = {
-    '🏛️ تنظيمي': ['sec', 'regulation', 'law', 'ban', 'legal', 'congress', 'senate'],
-    '💰 اقتصادي': ['fed', 'inflation', 'rate', 'dollar', 'recession', 'economy'],
-    '🔒 أمني': ['hack', 'breach', 'scam', 'theft', 'exploit'],
-    '📡 تقني': ['upgrade', 'network', 'protocol', 'layer2', 'mainnet']
+    '🏛️ تنظيمي': ['sec', 'regulation', 'law', 'ban', 'legal', 'congress', 'senate', 'lawsuit'],
+    '💰 اقتصادي': ['fed', 'inflation', 'rate', 'dollar', 'recession', 'economy', 'interest', 'jobs'],
+    '🔒 أمني': ['hack', 'breach', 'scam', 'theft', 'exploit', 'vulnerability'],
+    '📡 تقني': ['upgrade', 'network', 'protocol', 'layer2', 'mainnet', 'launch'],
+    '🌍 جيوسياسي': ['war', 'iran', 'russia', 'china', 'sanctions', 'attack', 'crisis']
+}
+
+# نظام تقييم متطور
+IMPACT_WORDS = {
+    'catastrophic': ['war', 'nuclear', 'collapse', 'emergency', 'bank run', 'default'],
+    'very_high': ['sec', 'fed', 'lawsuit', 'hack', 'ban', 'critical'],
+    'high': ['regulation', 'inflation', 'recession', 'crash', 'surge', 'pump'],
+    'medium': ['etf', 'rate cut', 'partnership', 'adoption', 'milestone'],
+    'low': ['update', 'launch', 'event', 'conference', 'podcast']
 }
 
 def extract_coins(text):
@@ -54,8 +63,8 @@ def detect_category(text):
 
 def analyze_sentiment(text):
     text_lower = text.lower()
-    positive = ['surge', 'pump', 'bull', 'gain', 'up', 'positive']
-    negative = ['crash', 'dump', 'bear', 'down', 'loss', 'negative']
+    positive = ['surge', 'pump', 'bull', 'gain', 'up', 'positive', '新高', 'ارتفع', 'soar', 'rally']
+    negative = ['crash', 'dump', 'bear', 'down', 'loss', 'negative', 'هبط', 'انخفض', 'plunge', 'slump']
     score = sum(1 for w in positive if w in text_lower) - sum(1 for w in negative if w in text_lower)
     if score > 0:
         return '🟢 إيجابي'
@@ -64,22 +73,49 @@ def analyze_sentiment(text):
     return '⚪ محايد'
 
 def get_importance(text):
-    score = 5
-    high_impact = ['sec', 'fed', 'hack', 'lawsuit', 'emergency', 'breaking']
-    for w in high_impact:
-        if w in text.lower():
+    """
+    حساب أهمية الخبر من 1 إلى 10
+    """
+    text_lower = text.lower()
+    score = 3  # أساس أقل لظهور المزيد من الأخبار
+    
+    # كلمات كارثية
+    for word in IMPACT_WORDS['catastrophic']:
+        if word in text_lower:
+            score += 5
+    
+    # كلمات عالية جداً
+    for word in IMPACT_WORDS['very_high']:
+        if word in text_lower:
+            score += 4
+    
+    # كلمات عالية
+    for word in IMPACT_WORDS['high']:
+        if word in text_lower:
             score += 3
+    
+    # كلمات متوسطة
+    for word in IMPACT_WORDS['medium']:
+        if word in text_lower:
+            score += 2
+    
+    # كلمات منخفضة
+    for word in IMPACT_WORDS['low']:
+        if word in text_lower:
+            score += 1
+    
+    # حد أقصى 10
     return min(score, 10)
 
 def analyze_news(title):
-    # ترجمة العنوان للعربية
     title_ar = translate_to_arabic(title)
     
     return {
-        'title_ar': title_ar,           # العنوان بالعربية
-        'title_en': title,               # العنوان الأصلي
+        'title_ar': title_ar,
+        'title_en': title,
         'coins': extract_coins(title),
         'category': detect_category(title),
         'sentiment': analyze_sentiment(title),
-        'importance': get_importance(title)
+        'importance': get_importance(title)  # الآن من 3 إلى 10
     }
+    
