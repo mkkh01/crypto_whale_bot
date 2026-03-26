@@ -53,6 +53,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📌 **الأوامر المساعدة:**\n"
         "/price BTC - سعر البيتكوين\n"
         "/watchlist - أسعار العملات المفضلة\n"
+        "/reset - مسح ذاكرة الأخبار المرسلة\n"
         "/stop - إيقاف الإرسال التلقائي",
         parse_mode='Markdown'
     )
@@ -101,6 +102,25 @@ async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += f"❌ {symbol}: غير متاح\n"
     
     await update.message.reply_text(text, parse_mode='Markdown')
+
+async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """مسح جميع الأخبار المرسلة سابقاً"""
+    try:
+        if os.path.exists("sent_news.json"):
+            os.remove("sent_news.json")
+            await update.message.reply_text(
+                "🔄 **تم مسح ذاكرة الأخبار المرسلة**\n\n"
+                "✅ ستصل إليك الأخبار الجديدة خلال 15 ثانية",
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(
+                "ℹ️ **لا توجد أخبار مرسلة سابقاً**\n\n"
+                "✅ البوت جاهز لاستقبال الأخبار الجديدة",
+                parse_mode='Markdown'
+            )
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطأ: {e}")
 
 async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global CHAT_ID
@@ -169,6 +189,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("price", price_command))
     app.add_handler(CommandHandler("watchlist", watchlist_command))
+    app.add_handler(CommandHandler("reset", reset_command))
     app.add_handler(CommandHandler("stop", stop_command))
     
     if app.job_queue:
