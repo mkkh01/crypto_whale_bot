@@ -1,7 +1,6 @@
 import os
 import asyncio
 import requests
-import time
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from news_fetcher import fetch_all_news
@@ -22,17 +21,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🐋 **بوت الحوت - النظام الاحترافي**\n\n"
         "📊 **الأوامر المتاحة:**\n"
-        "/latest - آخر الأخبار مع تحليل\n"
+        "/latest - آخر الأخبار مع تحليل (بالعربية)\n"
         "/signal - إشارة تداول فورية\n"
         "/price BTC - سعر البيتكوين\n"
         "/watchlist - أسعار العملات المفضلة\n\n"
-        "⚡ **الإشارات تُرسل عند ظهور أخبار مهمة**",
+        "⚡ **الإشارات تُرسل فوراً عند ظهور أخبار مهمة**",
         parse_mode='Markdown'
     )
 
 async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("🔍 جاري جلب الأخبار...")
-    news_list = fetch_all_news(limit=3)
+    news_list = fetch_all_news(limit=5)
     if not news_list:
         await msg.edit_text("❌ لا توجد أخبار حالياً")
         return
@@ -81,7 +80,7 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     coin_id = coin_map.get(coin, f"{coin}-{coin}")
     
     try:
-        response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=5)
+        response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=10)
         data = response.json()
         price = data['quotes']['USD']['price']
         symbol = coin.upper()
@@ -101,7 +100,7 @@ async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for coin_id, symbol in coins.items():
         try:
-            response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=5)
+            response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=10)
             data = response.json()
             price = data['quotes']['USD']['price']
             text += f"💰 {symbol}: ${price:,.2f}\n"
@@ -118,6 +117,7 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
         return
     
     # حماية: لا تفحص أكثر من مرة كل 15 ثانية
+    import time
     current_time = time.time()
     if current_time - last_check_time < 15:
         return
@@ -143,8 +143,8 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
                 analysis = analyze_news(news['title'])
                 signal = generate_signal(analysis, news)
                 
-                # إرسال فقط الأخبار ذات الأهمية العالية
-                if analysis['importance'] >= 7 or signal['confidence'] > 70:
+                # ✅ تم التعديل: إرسال الأخبار ذات أهمية 3 أو أكثر (للتجربة)
+                if analysis['importance'] >= 3:
                     text = f"🚨 **خبر عاجل** 🚨\n\n"
                     text += f"📰 {analysis['title_ar']}\n"
                     text += f"🏷️ {analysis['category']} | {analysis['sentiment']}\n"
@@ -152,7 +152,8 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
                     text += f"⭐ الأهمية: {analysis['importance']}/10\n"
                     text += f"🎯 **الإشارة:** {signal['action']} {signal['emoji']}\n"
                     text += f"📊 الثقة: {signal['confidence']}%\n"
-                    text += f"💡 {signal['reason']}"
+                    text += f"💡 {signal['reason']}\n"
+                    text += f"🔗 [رابط الخبر]({news['link']})"
                     
                     await context.bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown', disable_web_page_preview=True)
                     save_news(news['id'])
