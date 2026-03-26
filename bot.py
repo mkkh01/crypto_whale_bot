@@ -2,14 +2,15 @@ import os
 import asyncio
 import requests
 import time
-import random
+import hashlib
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+from news_fetcher import fetch_all_news
 from analyzer import analyze_news, get_signal_explanation
 from signal_generator import generate_signal
 from storage import load_sent, save_sent, is_news_sent, save_news
 
-# ========== خادم ويب بسيط لـ Render ==========
+# ========== خادم ويب لـ Render ==========
 from flask import Flask
 from threading import Thread
 
@@ -17,7 +18,7 @@ app_web = Flask('')
 
 @app_web.route('/')
 def home():
-    return "🐋 Bot is running - Crypto Whale Bot"
+    return "🐋 Crypto Whale Bot is running"
 
 @app_web.route('/alive')
 def alive():
@@ -29,54 +30,10 @@ def run_web():
 
 Thread(target=run_web).start()
 print("✅ خادم الويب شغال على المنفذ 10000")
-# ===============================================
+# ========================================
 
 TOKEN = os.environ.get("BOT_TOKEN", "8715770007:AAGXV9GyGACyEeSEKGUTMNXwqaOZ14UQKcM")
 CHAT_ID = None
-
-# أخبار تجريبية مضمونة (تتغير باستمرار)
-DEMO_NEWS = [
-    {"title": "🚨 SEC Files Lawsuit Against Binance, BNB Drops 8%", "source": "cointelegraph.com"},
-    {"title": "💰 Bitcoin Surges to $73,000 as ETF Inflows Hit Record", "source": "cointelegraph.com"},
-    {"title": "🏦 Federal Reserve Signals Rate Cuts, Crypto Markets Rally", "source": "reuters.com"},
-    {"title": "🔒 Major Exchange Hack: $200 Million in ETH Stolen", "source": "thehackernews.com"},
-    {"title": "📈 Ethereum ETF Approval Expected Next Week", "source": "decrypt.co"},
-    {"title": "⚡ Solana Network Suffers Outage, SOL Drops 5%", "source": "cryptoslate.com"},
-    {"title": "🇺🇸 Trump Announces Pro-Crypto Policy, Bitcoin Jumps", "source": "politico.com"},
-    {"title": "🌍 IMF Warns of Global Recession Risk, Bitcoin Drops", "source": "reuters.com"},
-    {"title": "🔐 Quantum Computing Threatens Bitcoin Security", "source": "wired.com"},
-    {"title": "📊 MicroStrategy Buys Another 10,000 BTC", "source": "newsbtc.com"},
-    {"title": "💥 Bitcoin Dumps 5% After Fed Chair Comments", "source": "bloomberg.com"},
-    {"title": "🚀 Ethereum Layer 2 Transaction Volume Hits New ATH", "source": "cointelegraph.com"},
-]
-
-def fetch_news(limit=8):
-    """جلب أخبار تجريبية مع IDs متغيرة باستمرار"""
-    # طابع زمني يتغير كل 10 ثوانٍ
-    timestamp = int(time.time() / 10)
-    
-    # اختيار أخبار عشوائية
-    random.seed(timestamp)
-    selected = random.sample(DEMO_NEWS, min(limit, len(DEMO_NEWS)))
-    
-    news_list = []
-    for i, item in enumerate(selected):
-        # ID فريد لكل خبر (يتغير باستمرار)
-        unique_id = f"{item['title']}_{timestamp}_{i}"
-        news_id = hashlib.md5(unique_id.encode()).hexdigest()
-        
-        news_list.append({
-            'id': news_id,
-            'title': item['title'],
-            'link': f"https://{item['source']}/news/{news_id[:8]}",
-            'source': item['source']
-        })
-    
-    return news_list
-
-fetch_all_news = fetch_news
-
-# متغيرات للتحكم
 last_check_time = 0
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -88,17 +45,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🐋 **بوت الحوت - النظام الاحترافي**\n\n"
         "✅ **البوت يعمل الآن تلقائياً!**\n\n"
         f"📱 **معرف الدردشة:** `{CHAT_ID}`\n\n"
-        "⚡ **سيتم إرسال الأخبار كل 15 ثانية**\n\n"
-        "📌 **الأوامر:**\n"
+        "📊 **سيتم إرسال الأخبار المهمة إليك فور ظهورها:**\n"
+        "• تحليل فوري للخبر\n"
+        "• تحديد العملات المتأثرة\n"
+        "• إشارة شراء/بيع/ترقب\n"
+        "• تفسير سبب الإشارة\n\n"
+        "⚡ **الأخبار تصل تلقائياً كل 15 ثانية**\n\n"
+        "📌 **الأوامر المساعدة:**\n"
         "/price BTC - سعر البيتكوين\n"
-        "/watchlist - أسعار العملات\n"
-        "/reset - مسح الذاكرة\n"
-        "/stop - إيقاف الإرسال",
+        "/watchlist - أسعار العملات المفضلة\n"
+        "/reset - مسح ذاكرة الأخبار المرسلة\n"
+        "/stop - إيقاف الإرسال التلقائي",
         parse_mode='Markdown'
     )
     
     # إرسال خبر تجريبي فوري للتأكد
-    await asyncio.sleep(2)
+    await asyncio.sleep(1)
     await test_news(context)
 
 async def test_news(context: ContextTypes.DEFAULT_TYPE):
@@ -117,55 +79,94 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     coin = args[0].lower() if args else "btc"
     
-    coin_map = {"btc": "btc-bitcoin", "eth": "eth-ethereum", "sol": "sol-solana", "bnb": "bnb-binance-coin"}
+    coin_map = {
+        "btc": "btc-bitcoin",
+        "eth": "eth-ethereum",
+        "sol": "sol-solana",
+        "xrp": "xrp-xrp",
+        "doge": "doge-dogecoin",
+        "bnb": "bnb-binance-coin"
+    }
+    
     coin_id = coin_map.get(coin, f"{coin}-{coin}")
     
     try:
         response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=10)
         data = response.json()
         price = data['quotes']['USD']['price']
-        await update.message.reply_text(f"💰 **{coin.upper()}/USD**\nالسعر: ${price:,.2f}", parse_mode='Markdown')
+        symbol = coin.upper()
+        await update.message.reply_text(f"💰 **{symbol}/USD**\nالسعر: ${price:,.2f}", parse_mode='Markdown')
     except:
         await update.message.reply_text(f"❌ لم يتم العثور على {coin.upper()}")
 
 async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    coins = {"btc-bitcoin": "BTC", "eth-ethereum": "ETH", "sol-solana": "SOL", "bnb-binance-coin": "BNB"}
+    coins = {
+        "btc-bitcoin": "BTC",
+        "eth-ethereum": "ETH",
+        "sol-solana": "SOL",
+        "bnb-binance-coin": "BNB",
+    }
+    
     text = "📊 **قائمة المراقبة**\n\n"
+    
     for coin_id, symbol in coins.items():
         try:
             response = requests.get(f"https://api.coinpaprika.com/v1/tickers/{coin_id}", timeout=10)
-            price = response.json()['quotes']['USD']['price']
+            data = response.json()
+            price = data['quotes']['USD']['price']
             text += f"💰 {symbol}: ${price:,.2f}\n"
         except:
             text += f"❌ {symbol}: غير متاح\n"
+    
     await update.message.reply_text(text, parse_mode='Markdown')
 
 async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """مسح جميع الأخبار المرسلة سابقاً"""
     try:
         if os.path.exists("sent_news.json"):
             os.remove("sent_news.json")
-        await update.message.reply_text("🔄 **تم مسح الذاكرة**\n✅ ستصل الأخبار خلال 15 ثانية", parse_mode='Markdown')
+            await update.message.reply_text(
+                "🔄 **تم مسح ذاكرة الأخبار المرسلة**\n\n"
+                "✅ ستصل إليك الأخبار الجديدة خلال 15 ثانية",
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(
+                "ℹ️ **لا توجد أخبار مرسلة سابقاً**\n\n"
+                "✅ البوت جاهز لاستقبال الأخبار الجديدة",
+                parse_mode='Markdown'
+            )
     except Exception as e:
         await update.message.reply_text(f"❌ خطأ: {e}")
 
 async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global CHAT_ID
     CHAT_ID = None
-    await update.message.reply_text("⏸️ **تم إيقاف الإرسال**\nأرسل /start للتشغيل", parse_mode='Markdown')
+    print(f"⏸️ تم إيقاف الإرسال التلقائي بواسطة المستخدم")
+    await update.message.reply_text(
+        "⏸️ **تم إيقاف الإرسال التلقائي**\n"
+        "لإعادة التشغيل، أرسل /start مرة أخرى",
+        parse_mode='Markdown'
+    )
 
 async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
+    """
+    فحص الأخبار وإرسالها تلقائياً كل 15 ثانية
+    """
     global CHAT_ID, last_check_time
     
     if not CHAT_ID:
         return
     
     current_time = time.time()
-    if current_time - last_check_time < 12:
+    if current_time - last_check_time < 10:
         return
     last_check_time = current_time
     
     try:
-        news_list = fetch_all_news(5)
+        # جلب 10 أخبار
+        news_list = fetch_all_news(10)
+        print(f"📡 [{time.strftime('%H:%M:%S')}] جلب {len(news_list)} خبر")
         
         if not news_list:
             print(f"📭 [{time.strftime('%H:%M:%S')}] لا توجد أخبار")
@@ -183,7 +184,7 @@ async def check_news_urgent(context: ContextTypes.DEFAULT_TYPE):
                 text = f"🚨 **خبر جديد** 🚨\n\n"
                 text += f"📰 {analysis['title_ar']}\n"
                 text += f"🏷️ {analysis['category']} | {analysis['sentiment']}\n"
-                text += f"💰 **العملات:** {', '.join(analysis['coins'])}\n"
+                text += f"💰 **العملات المتأثرة:** {', '.join(analysis['coins'])}\n"
                 text += f"⭐ **الأهمية:** {analysis['importance']}/10\n"
                 text += f"🎯 **الإشارة:** {signal['action']} {signal['emoji']}\n"
                 text += f"📊 **الثقة:** {signal['confidence']}%\n"
@@ -214,11 +215,13 @@ def main():
     app.add_handler(CommandHandler("reset", reset_command))
     app.add_handler(CommandHandler("stop", stop_command))
     
+    # تحديث كل 15 ثانية
     if app.job_queue:
         app.job_queue.run_repeating(check_news_urgent, interval=15, first=5)
     
     print("🐋 بوت الحوت شغال - إرسال تلقائي كل 15 ثانية...")
     print("✅ خادم الويب شغال")
+    print("📱 انتظر إرسال /start لتسجيل معرف الدردشة")
     app.run_polling()
 
 if __name__ == "__main__":
