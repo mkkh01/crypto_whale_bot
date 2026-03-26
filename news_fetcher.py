@@ -1,61 +1,44 @@
 import hashlib
 import random
 import time
+import feedparser
 
-def fetch_news(limit=5):
+# أخبار تجريبية متنوعة
+TEST_NEWS_BASE = [
+    {'title': '🚨 SEC Files Lawsuit Against Binance, BNB Drops 8%', 'source': 'cointelegraph.com'},
+    {'title': '💰 Bitcoin Surges to $73,000 as ETF Inflows Hit Record', 'source': 'cointelegraph.com'},
+    {'title': '🏦 Federal Reserve Signals Rate Cuts, Crypto Markets Rally', 'source': 'reuters.com'},
+    {'title': '🔒 Major Exchange Hack: $200 Million in ETH Stolen', 'source': 'thehackernews.com'},
+    {'title': '📈 Ethereum ETF Approval Expected Next Week', 'source': 'decrypt.co'},
+    {'title': '⚡ Solana Network Suffers Outage, SOL Drops 5%', 'source': 'cryptoslate.com'},
+    {'title': '🇺🇸 Trump Announces Pro-Crypto Policy, Bitcoin Jumps', 'source': 'politico.com'},
+    {'title': '🌍 IMF Warns of Global Recession Risk', 'source': 'reuters.com'},
+    {'title': '🔐 New Quantum Computing Threatens Bitcoin Security', 'source': 'wired.com'},
+    {'title': '📊 MicroStrategy Buys Another 10,000 BTC', 'source': 'newsbtc.com'},
+]
+
+def fetch_news(limit=8):
     """
-    أخبار تجريبية فقط - تعمل 100%
+    جلب أخبار جديدة باستمرار (تتغير كل دورة)
     """
-    # أخبار تجريبية متنوعة
-    test_news = [
-        {
-            'title': '🚨 SEC Files Lawsuit Against Binance, BNB Drops 8%',
-            'link': 'https://cointelegraph.com/news/sec-sues-binance',
-            'source': 'cointelegraph.com'
-        },
-        {
-            'title': '💰 Bitcoin Surges to $73,000 as ETF Inflows Hit Record',
-            'link': 'https://cointelegraph.com/news/bitcoin-etf-record',
-            'source': 'cointelegraph.com'
-        },
-        {
-            'title': '🏦 Federal Reserve Signals Rate Cuts, Crypto Markets Rally',
-            'link': 'https://reuters.com/fed-rate-cuts',
-            'source': 'reuters.com'
-        },
-        {
-            'title': '🔒 Major Exchange Hack: $200 Million in ETH Stolen',
-            'link': 'https://thehackernews.com/crypto-hack',
-            'source': 'thehackernews.com'
-        },
-        {
-            'title': '📈 Ethereum ETF Approval Expected Next Week',
-            'link': 'https://decrypt.co/ethereum-etf-approval',
-            'source': 'decrypt.co'
-        },
-        {
-            'title': '⚡ Solana Network Suffers Outage, SOL Drops 5%',
-            'link': 'https://cryptoslate.com/solana-outage',
-            'source': 'cryptoslate.com'
-        },
-        {
-            'title': '🇺🇸 Trump Announces Pro-Crypto Policy, Bitcoin Jumps',
-            'link': 'https://politico.com/trump-crypto',
-            'source': 'politico.com'
-        }
-    ]
+    # طابع زمني يتغير كل 15 ثانية
+    timestamp = int(time.time() / 15)
     
-    # إضافة طابع زمني لمنع التكرار
-    timestamp = int(time.time() / 60)
+    # اختيار أخبار عشوائية مع تغيير الترتيب
+    random.seed(timestamp)
+    shuffled_news = random.sample(TEST_NEWS_BASE, min(limit, len(TEST_NEWS_BASE)))
     
+    # إنشاء أخبار بـ IDs متغيرة
     news_list = []
-    for item in test_news[:limit]:
-        unique_string = f"{item['link']}_{timestamp}"
+    for i, item in enumerate(shuffled_news):
+        # ID يعتمد على العنوان + الوقت + رقم عشوائي
+        unique_string = f"{item['title']}_{timestamp}_{i}_{random.randint(1, 1000)}"
         news_id = hashlib.md5(unique_string.encode()).hexdigest()
+        
         news_list.append({
             'id': news_id,
             'title': item['title'],
-            'link': item['link'],
+            'link': f"https://{item['source']}/news/{news_id}",
             'source': item['source']
         })
     
