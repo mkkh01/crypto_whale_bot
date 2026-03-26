@@ -2,9 +2,6 @@ import hashlib
 import random
 
 def fetch_news(limit=5):
-    """
-    أخبار تجريبية متنوعة مع تصنيفات مختلفة
-    """
     test_news = [
         {
             'id': '1',
@@ -35,28 +32,9 @@ def fetch_news(limit=5):
             'title': '📈 Ethereum ETF Approval Expected Next Week, Analysts Predict 30% Rally',
             'link': 'https://decrypt.co/ethereum-etf-approval',
             'source': 'decrypt.co'
-        },
-        {
-            'id': '6',
-            'title': '⚡ Solana Network Suffers 4-Hour Outage, SOL Drops 5%',
-            'link': 'https://cryptoslate.com/solana-outage',
-            'source': 'cryptoslate.com'
-        },
-        {
-            'id': '7',
-            'title': '🇺🇸 Trump Announces Pro-Crypto Policy, Bitcoin Jumps 3%',
-            'link': 'https://politico.com/trump-crypto',
-            'source': 'politico.com'
-        },
-        {
-            'id': '8',
-            'title': '📊 MicroStrategy Buys Another 10,000 BTC, Total Holdings Reach 200,000',
-            'link': 'https://newsbtc.com/microstrategy-btc',
-            'source': 'newsbtc.com'
         }
     ]
     
-    # خلط الأخبار عشوائياً
     random.shuffle(test_news)
     return test_news[:limit]
 
