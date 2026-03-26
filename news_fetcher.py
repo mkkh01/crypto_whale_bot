@@ -1,41 +1,79 @@
+import feedparser
 import hashlib
 import random
+import time
 
-def fetch_news(limit=2):
-    test_news = [
-        {
-            'id': '1',
-            'title': '🚨 BREAKING: SEC Files Lawsuit Against Binance, BNB Drops 8%',
-            'link': 'https://cointelegraph.com/news/sec-sues-binance',
-            'source': 'cointelegraph.com'
-        },
-        {
-            'id': '2',
-            'title': '💰 Bitcoin Surges to $73,000 as ETF Inflows Hit Record $1.2B',
-            'link': 'https://cointelegraph.com/news/bitcoin-etf-record',
-            'source': 'cointelegraph.com'
-        },
-        {
-            'id': '3',
-            'title': '🏦 Federal Reserve Signals Rate Cuts in September, Crypto Markets Rally',
-            'link': 'https://reuters.com/fed-rate-cuts',
-            'source': 'reuters.com'
-        },
-        {
-            'id': '4',
-            'title': '🔒 Major Exchange Hack: $200 Million in ETH Stolen from Hot Wallet',
-            'link': 'https://thehackernews.com/crypto-hack',
-            'source': 'thehackernews.com'
-        },
-        {
-            'id': '5',
-            'title': '📈 Ethereum ETF Approval Expected Next Week, Analysts Predict 30% Rally',
-            'link': 'https://decrypt.co/ethereum-etf-approval',
-            'source': 'decrypt.co'
-        }
-    ]
+# مصادر متنوعة (سياسية، اقتصادية، عسكرية، كريبتو)
+SOURCES = [
+    # أخبار كريبتو
+    "https://cointelegraph.com/rss",
+    "https://decrypt.co/feed",
+    "https://cryptopotato.com/feed",
     
-    random.shuffle(test_news)
-    return test_news[:limit]
+    # أخبار اقتصادية عالمية
+    "https://www.bloomberg.com/feed",
+    "https://www.reuters.com/rss",
+    "https://www.ft.com/?format=rss",
+    
+    # أخبار سياسية وجيوسياسية
+    "https://www.bbc.com/news",
+    "https://www.aljazeera.com/xml/rss.xml",
+    "https://www.politico.com/rss",
+    
+    # أخبار عسكرية وأمنية
+    "https://www.defensenews.com/feed/",
+    "https://thehackernews.com/feeds/posts/default",
+]
+
+# كلمات مفتاحية لفلترة الأخبار المؤثرة
+KEYWORDS = [
+    # كريبتو
+    "bitcoin", "btc", "ethereum", "eth", "crypto", "blockchain", "binance", "coinbase", "sec", "etf",
+    "solana", "xrp", "dogecoin", "ripple",
+    # اقتصادي
+    "fed", "federal reserve", "inflation", "recession", "interest rate", "economy", "dollar", "stimulus",
+    "jobs report", "unemployment", "gdp", "banking", "credit",
+    # سياسي
+    "trump", "biden", "congress", "senate", "regulation", "sanctions", "war", "conflict",
+    # جيوسياسي وعسكري
+    "iran", "russia", "china", "ukraine", "israel", "oil price", "attack", "crisis", "emergency",
+    # أمني
+    "hack", "breach", "scam", "theft", "exploit", "security", "vulnerability"
+]
+
+def fetch_news(limit=8):
+    """
+    جلب أخبار حقيقية من مصادر متنوعة وتصفيتها حسب الكلمات المفتاحية
+    """
+    news_list = []
+    
+    for url in SOURCES:
+        try:
+            feed = feedparser.parse(url, timeout=8)
+            for entry in feed.entries[:3]:
+                title = entry.title.lower()
+                # فلترة حسب الكلمات المفتاحية
+                if any(kw in title for kw in KEYWORDS):
+                    news_id = hashlib.md5(entry.link.encode()).hexdigest()
+                    news_list.append({
+                        'id': news_id,
+                        'title': entry.title,
+                        'link': entry.link,
+                        'source': url.split('/')[2]
+                    })
+        except:
+            continue
+    
+    # إزالة التكرارات
+    unique = {}
+    for news in news_list:
+        if news['id'] not in unique:
+            unique[news['id']] = news
+    
+    # خلط عشوائي
+    result = list(unique.values())
+    random.shuffle(result)
+    
+    return result[:limit]
 
 fetch_all_news = fetch_news
