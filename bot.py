@@ -67,7 +67,7 @@ async def test_news(context: ContextTypes.DEFAULT_TYPE):
         return
     text = "🧪 **خبر تجريبي - البوت يعمل!**\n\n"
     text += "✅ إذا وصلتك هذه الرسالة، البوت يعمل بشكل صحيح.\n"
-    text += "⚡ ستصل الأخبار الحقيقية (ذات أهمية ≥ 7) خلال 15 ثانية.\n"
+    text += "⚡ ستصل الأخبار الحقيقية (ذات أهمية ≥ 4) خلال 15 ثانية.\n"
     text += "📌 إذا لم تصل أخبار، استخدم /force"
     await context.bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='Markdown')
 
