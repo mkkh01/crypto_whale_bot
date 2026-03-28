@@ -3,29 +3,15 @@ import requests
 def translate_to_arabic(text):
     try:
         url = "https://translate.googleapis.com/translate_a/single"
-        params = {
-            'client': 'gtx',
-            'sl': 'en',
-            'tl': 'ar',
-            'dt': 't',
-            'q': text
-        }
-        response = requests.get(url, params=params, timeout=5)
-        result = response.json()
-        return result[0][0][0]
+        params = {'client': 'gtx', 'sl': 'en', 'tl': 'ar', 'dt': 't', 'q': text}
+        r = requests.get(url, params=params, timeout=5)
+        return r.json()[0][0][0]
     except:
         return text
 
-def extract_coins(text):
-    text_lower = text.lower()
-    coins = []
-    if any(w in text_lower for w in ["bitcoin", "btc"]): coins.append("BTC")
-    if any(w in text_lower for w in ["ethereum", "eth"]): coins.append("ETH")
-    if any(w in text_lower for w in ["solana", "sol"]): coins.append("SOL")
-    if any(w in text_lower for w in ["binance", "bnb"]): coins.append("BNB")
-    if any(w in text_lower for w in ["xrp", "ripple"]): coins.append("XRP")
-    if any(w in text_lower for w in ["dogecoin", "doge"]): coins.append("DOGE")
-    return coins if coins else ["عام"]
+def extract_coins(news):
+    """تستقبل كائن الخبر وتعيد قائمة العملات المستخرجة منه"""
+    return news.get('coins', ['عام'])
 
 def detect_category(text):
     text_lower = text.lower()
@@ -48,8 +34,7 @@ def analyze_sentiment(text):
     if score < 0: return "🔴 سلبي"
     return "⚪ محايد"
 
-def get_importance(title, source):
-    # نجعل الأهمية دائماً 5 أو أكثر لتمرير أي خبر (يمكن تعديله لاحقاً)
+def get_importance(title):
     importance = 5
     high_impact = ["sec", "fed", "hack", "lawsuit", "emergency", "breaking", "crash", "surge"]
     for w in high_impact:
@@ -70,13 +55,13 @@ def get_signal_explanation(signal, analysis):
     else:
         return (f"⚪ **لماذا؟**\n• خبر ضعيف الأهمية {importance}/10\n• لا تأثير فوري.")
 
-def analyze_news(title, source):
+def analyze_news(title, coins):
     title_ar = translate_to_arabic(title)
     return {
         'title_ar': title_ar,
         'title_en': title,
-        'coins': extract_coins(title),
+        'coins': coins,
         'category': detect_category(title),
         'sentiment': analyze_sentiment(title),
-        'importance': get_importance(title, source)
+        'importance': get_importance(title)
     }
