@@ -1,29 +1,18 @@
 import requests
 
-# تقييم المصادر (مصداقية وتأثير)
-SOURCE_IMPORTANCE = {
-    "bloomberg.com": 9,
-    "reuters.com": 9,
-    "ft.com": 8,
-    "wsj.com": 8,
-    "federalreserve.gov": 10,
-    "sec.gov": 10,
-    "cointelegraph.com": 6,
-    "decrypt.co": 5,
-}
-
-# كلمات تدل على أهمية قصوى
-CRITICAL_WORDS = [
-    "emergency", "breaking", "urgent", "lawsuit", "hack", "crash",
-    "collapse", "default", "war", "attack", "ban", "sanctions"
-]
-
 def translate_to_arabic(text):
     try:
         url = "https://translate.googleapis.com/translate_a/single"
-        params = {'client': 'gtx', 'sl': 'en', 'tl': 'ar', 'dt': 't', 'q': text}
-        r = requests.get(url, params=params, timeout=5)
-        return r.json()[0][0][0]
+        params = {
+            'client': 'gtx',
+            'sl': 'en',
+            'tl': 'ar',
+            'dt': 't',
+            'q': text
+        }
+        response = requests.get(url, params=params, timeout=5)
+        result = response.json()
+        return result[0][0][0]
     except:
         return text
 
@@ -34,6 +23,8 @@ def extract_coins(text):
     if any(w in text_lower for w in ["ethereum", "eth"]): coins.append("ETH")
     if any(w in text_lower for w in ["solana", "sol"]): coins.append("SOL")
     if any(w in text_lower for w in ["binance", "bnb"]): coins.append("BNB")
+    if any(w in text_lower for w in ["xrp", "ripple"]): coins.append("XRP")
+    if any(w in text_lower for w in ["dogecoin", "doge"]): coins.append("DOGE")
     return coins if coins else ["عام"]
 
 def detect_category(text):
@@ -58,16 +49,12 @@ def analyze_sentiment(text):
     return "⚪ محايد"
 
 def get_importance(title, source):
-    # الأساس 5
+    # نجعل الأهمية دائماً 5 أو أكثر لتمرير أي خبر (يمكن تعديله لاحقاً)
     importance = 5
-    # إضافة حسب المصدر
-    src_key = source.replace("www.", "")
-    importance += SOURCE_IMPORTANCE.get(src_key, 0) // 2  # مثلاً 5+4=9
-    # إضافة حسب الكلمات الحرجة
-    title_lower = title.lower()
-    for word in CRITICAL_WORDS:
-        if word in title_lower:
-            importance += 3
+    high_impact = ["sec", "fed", "hack", "lawsuit", "emergency", "breaking", "crash", "surge"]
+    for w in high_impact:
+        if w in title.lower():
+            importance += 2
     return min(importance, 10)
 
 def get_signal_explanation(signal, analysis):
@@ -85,12 +72,11 @@ def get_signal_explanation(signal, analysis):
 
 def analyze_news(title, source):
     title_ar = translate_to_arabic(title)
-    importance = get_importance(title, source)
     return {
         'title_ar': title_ar,
         'title_en': title,
         'coins': extract_coins(title),
         'category': detect_category(title),
         'sentiment': analyze_sentiment(title),
-        'importance': importance,
+        'importance': get_importance(title, source)
     }
