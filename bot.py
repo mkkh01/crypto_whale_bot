@@ -1,6 +1,6 @@
 """
 ═══════════════════════════════════════════════════════════
-   البوت الرئيسي - Crypto Whale Bot (نسخة محدثة)
+   البوت الرئيسي - Crypto Whale Bot (نسخة نهائية)
 ═══════════════════════════════════════════════════════════
 """
 
@@ -82,7 +82,7 @@ _{analysis['title_en']}_
 
 
 # ══════════════════════════════════════════════════════════
-# وظيفة الفحص (مركزية - تستخدم للأتمتة واليدوي)
+# وظيفة الفحص (مركزية)
 # ══════════════════════════════════════════════════════════
 
 async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
@@ -331,11 +331,10 @@ async def force_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     wait_msg = await update.message.reply_text("🔄 جاري الفحص اليدوي...")
     
     try:
-        # فحص مباشر بدون job_queue
         result = await check_news_job(context)
         
         if result == "no_news":
-            await wait_msg.edit_text("📭 لا توجد أخبار من المصادر حالياً")
+            await wait_msg.edit_text("📭 لا توجد أخبار من المصادر حالياً\n\n💡 قد تكون المواقع ترفض الطلبات من السيرفر المجاني")
         elif result == "all_sent":
             await wait_msg.edit_text("📭 جميع الأخبار الحالية تم إرسالها مسبقاً\n\n💡 أرسل /reset لمسح المحفوظات")
         elif result.startswith("sent:"):
@@ -409,6 +408,30 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ══════════════════════════════════════════════════════════
+# دوال ما بعد التهيئة ومعالجة الأخطاء
+# ══════════════════════════════════════════════════════════
+
+async def post_init(application):
+    """تشغيل بعد تهيئة البوت - يحل مشكلة التعارض"""
+    try:
+        await application.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("✅ تم حذف Webhook القديم")
+    except Exception as e:
+        logger.warning(f"⚠️ خطأ في حذف Webhook: {e}")
+    await asyncio.sleep(3)
+    logger.info("✅ جاهز للعمل")
+
+
+async def error_handler(update, context):
+    """معالج الأخطاء - يمنع الانهيار"""
+    error = context.error
+    if "Conflict" in str(error):
+        logger.warning("⚠️ تعارض - سيتجاهل تلقائياً")
+        return
+    logger.error(f"❌ خطأ: {error}")
+
+
+# ══════════════════════════════════════════════════════════
 # نقطة الدخول الرئيسية
 # ══════════════════════════════════════════════════════════
 
@@ -416,8 +439,11 @@ def main():
     """تشغيل البوت"""
     logger.info("🐋 بدء تشغيل بوت الأخبار التحليلي...")
     
-    # إنشاء التطبيق
-    app = Application.builder().token(BOT_TOKEN).build()
+    # إنشاء التطبيق مع post_init
+    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    
+    # إضافة معالج أخطاء
+    app.add_error_handler(error_handler)
     
     # إضافة معالجات الأوامر
     app.add_handler(CommandHandler("start", start_command))
@@ -431,7 +457,10 @@ def main():
     
     # بدء البوت
     logger.info("🚀 البوت جاهز!")
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=["message"]
+    )
 
 
 if __name__ == "__main__":
