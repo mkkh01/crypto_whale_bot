@@ -1,8 +1,7 @@
 """
 ═══════════════════════════════════════════════════════════
-   وحدة جلب الأخبار - Fetcher
+   وحدة جلب الأخبار - Fetcher (نسخة محسنة)
 ═══════════════════════════════════════════════════════════
-تجلب الأخبار من مصادر RSS وتقوم بالتصفية الأولية
 """
 
 import re
@@ -10,12 +9,15 @@ import hashlib
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict
 from config import (
-    RSS_SOURCES, 
-    FILTER_KEYWORDS, 
-    REQUEST_TIMEOUT
+    RSS_SOURCES,
+    FILTER_KEYWORDS,
+    REQUEST_TIMEOUT,
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class NewsFetcher:
@@ -24,7 +26,9 @@ class NewsFetcher:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
         })
     
     def _generate_id(self, title: str, link: str) -> str:
@@ -39,29 +43,23 @@ class NewsFetcher:
         try:
             root = ET.fromstring(xml_content)
             
-            # البحث عن عناصر الأخبار (قد تكون item أو entry)
-            items = root.findall('.//item') or root.findall('.//{http://www.w3.org/2005/Atom}entry')
+            items = root.findall('.//item')
+            if not items:
+                items = root.findall('.//{http://www.w3.org/2005/Atom}entry')
             
-            for item in items[:15]:  # آخر 15 خبر من كل مصدر
+            logger.info(f"📊 {source_name}: عثر على {len(items)} عنصر")
+            
+            for item in items[:15]:
                 try:
-                    # استخراج العنوان
-                    title_elem = (
-                        item.find('title') or 
-                        item.find('{http://www.w3.org/2005/Atom}title')
-                    )
+                    title_elem = item.find('title') or item.find('{http://www.w3.org/2005/Atom}title')
                     title = title_elem.text if title_elem is not None else ""
                     
-                    # استخراج الرابط
-                    link_elem = (
-                        item.find('link') or 
-                        item.find('{http://www.w3.org/2005/Atom}link')
-                    )
+                    link_elem = item.find('link') or item.find('{http://www.w3.org/2005/Atom}link')
                     if link_elem is not None:
                         link = link_elem.text if link_elem.text else link_elem.get('href', '')
                     else:
                         link = ""
                     
-                    # استخراج التاريخ
                     date_elem = (
                         item.find('pubDate') or 
                         item.find('{http://www.w3.org/2005/Atom}published') or
@@ -69,11 +67,7 @@ class NewsFetcher:
                     )
                     pub_date = date_elem.text if date_elem is not None else ""
                     
-                    # استخراج الوصف
-                    desc_elem = (
-                        item.find('description') or 
-                        item.find('{http://www.w3.org/2005/Atom}summary')
-                    )
+                    desc_elem = item.find('description') or item.find('{http://www.w3.org/2005/Atom}summary')
                     description = desc_elem.text if desc_elem is not None else ""
                     
                     if title and link:
@@ -87,57 +81,61 @@ class NewsFetcher:
                             "source_priority": source_info.get("priority", 5),
                             "source_category": source_info.get("category", "general"),
                         })
-                except Exception as e:
+                except Exception:
                     continue
                     
         except ET.ParseError as e:
-            print(f"⚠️ خطأ في تحليل RSS من {source_name}: {e}")
+            logger.warning(f"⚠️ خطأ تحليل XML من {source_name}: {e}")
         except Exception as e:
-            print(f"⚠️ خطأ غير متوقع في {source_name}: {e}")
+            logger.warning(f"⚠️ خطأ في {source_name}: {e}")
         
         return news_list
     
     def _clean_html(self, text: str) -> str:
-        """إزالة أكواد HTML من النص"""
+        """إزالة أكواد HTML"""
         clean = re.sub(r'<[^>]+>', '', text)
         clean = re.sub(r'&[^;]+;', ' ', clean)
         clean = re.sub(r'\s+', ' ', clean).strip()
-        return clean[:200]  # اقتطاع الوصف
+        return clean[:200]
     
     def _passes_filter(self, title: str, description: str) -> bool:
-        """التحقق مما إذا كان الخبر يمرر التصفية الأولية"""
+        """التحقق من التصفية الأولية"""
         combined_text = (title + " " + description).lower()
-        
         for keyword in FILTER_KEYWORDS:
             if keyword in combined_text:
                 return True
-        
         return False
     
     def fetch_from_source(self, source_name: str, source_info: Dict) -> List[Dict]:
         """جلب الأخبار من مصدر واحد"""
         news_list = []
+        url = source_info["url"]
         
         try:
-            response = self.session.get(
-                source_info["url"],
-                timeout=REQUEST_TIMEOUT
-            )
+            logger.info(f"🔗 جاري جلب: {source_name}...")
+            response = self.session.get(url, timeout=REQUEST_TIMEOUT)
+            
+            logger.info(f"📥 {source_name}: حالة {response.status_code}")
             
             if response.status_code == 200:
                 raw_news = self._parse_rss(response.text, source_name, source_info)
                 
-                # تطبيق التصفية الأولية
+                filtered = []
                 for news in raw_news:
                     if self._passes_filter(news["title"], news["description"]):
-                        news_list.append(news)
-                        
+                        filtered.append(news)
+                
+                logger.info(f"✅ {source_name}: {len(filtered)} خبر بعد التصفية")
+                news_list = filtered
+            else:
+                logger.warning(f"⚠️ {source_name}: رمز حالة {response.status_code}")
+                
         except requests.exceptions.Timeout:
-            print(f"⏱️ انتهت مهلة الاتصال بـ {source_name}")
-        except requests.exceptions.RequestException as e:
-            print(f"⚠️ خطأ في الاتصال بـ {source_name}: {e}")
+            logger.warning(f"⏱️ انتهت مهلة {source_name}")
+        except requests.exceptions.ConnectionError:
+            logger.warning(f"🔌 خطأ اتصال {source_name}")
         except Exception as e:
-            print(f"⚠️ خطأ في جلب {source_name}: {e}")
+            logger.warning(f"⚠️ خطأ {source_name}: {e}")
         
         return news_list
     
@@ -149,11 +147,10 @@ class NewsFetcher:
             news = self.fetch_from_source(source_name, source_info)
             all_news.extend(news)
         
-        # ترتيب حسب الأولوية ثم حسب المصدر
         all_news.sort(key=lambda x: (-x["source_priority"], x["source"]))
+        logger.info(f"📊 المجموع النهائي: {len(all_news)} خبر")
         
         return all_news
 
 
-# إنشاء نسخة واحدة من الجالب
 fetcher = NewsFetcher()
