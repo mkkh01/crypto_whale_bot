@@ -1,4 +1,0 @@
-python-telegram-bot[job-queue]==22.7
-requests==2.33.0
-feedparser==6.0.12
-flask==3.0.0
