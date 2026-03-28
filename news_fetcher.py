@@ -1,9 +1,10 @@
 import feedparser
 import hashlib
 import random
+import requests
 import time
 
-# مصادر RSS موثوقة (تعمل من Render)
+# مصادر RSS
 SOURCES = [
     "https://cointelegraph.com/rss",
     "https://decrypt.co/feed",
@@ -12,24 +13,23 @@ SOURCES = [
     "https://cryptoslate.com/feed/",
 ]
 
-# كلمات مفتاحية واسعة لتغطية معظم الأخبار المؤثرة
 KEYWORDS = [
     "bitcoin", "btc", "ethereum", "eth", "crypto", "blockchain", "binance", "coinbase",
     "sec", "etf", "fed", "inflation", "recession", "economy", "dollar",
-    "regulation", "lawsuit", "hack", "breach", "war", "sanctions", "trump", "biden",
-    "solana", "xrp", "dogecoin", "ripple"
+    "regulation", "lawsuit", "hack", "breach", "war", "sanctions", "trump", "biden"
 ]
 
 def fetch_news(limit=8):
-    """جلب أخبار حقيقية فقط من المصادر المحددة"""
     news_list = []
     for url in SOURCES:
         try:
-            feed = feedparser.parse(url, timeout=8)
+            # جلب المحتوى باستخدام requests مع مهلة زمنية
+            response = requests.get(url, timeout=8)
+            response.raise_for_status()
+            feed = feedparser.parse(response.content)
             for entry in feed.entries[:3]:
                 title = entry.title
                 title_lower = title.lower()
-                # تصفية خفيفة: يجب أن تحتوي على كلمة من KEYWORDS
                 if any(kw in title_lower for kw in KEYWORDS):
                     news_id = hashlib.md5(entry.link.encode()).hexdigest()
                     news_list.append({
