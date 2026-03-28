@@ -2,17 +2,11 @@
 ═══════════════════════════════════════════════════════════
    ملف الإعدادات الرئيسي - Crypto Whale Bot
 ═══════════════════════════════════════════════════════════
-يحتوي على جميع الإعدادات القابلة للتعديل:
-- بيانات البوت
-- مصادر الأخبار
-- كلمات التصفية
-- إعدادات التحليل
 """
 
 import os
 from dotenv import load_dotenv
 
-# تحميل متغيرات البيئة
 load_dotenv()
 
 # ══════════════════════════════════════════════════════════
@@ -23,29 +17,18 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 CHAT_ID = os.getenv("CHAT_ID", "YOUR_CHAT_ID_HERE")
 
 # ══════════════════════════════════════════════════════════
-# 📰 مصادر الأخبار (RSS Feeds)
+# 📰 مصادر الأخبار (RSS Feeds) - محدثة
 # ══════════════════════════════════════════════════════════
 
 RSS_SOURCES = {
-    # مواقع كريبتو متخصصة
     "CoinTelegraph": {
         "url": "https://cointelegraph.com/rss",
-        "priority": 9,  # أولوية المصدر (1-10)
-        "category": "crypto"
-    },
-    "Decrypt": {
-        "url": "https://decrypt.co/feed",
-        "priority": 8,
+        "priority": 9,
         "category": "crypto"
     },
     "CryptoPotato": {
         "url": "https://cryptopotato.com/feed/",
-        "priority": 7,
-        "category": "crypto"
-    },
-    "The Block": {
-        "url": "https://www.theblock.co/rss.xml",
-        "priority": 9,
+        "priority": 8,
         "category": "crypto"
     },
     "CoinDesk": {
@@ -53,11 +36,20 @@ RSS_SOURCES = {
         "priority": 8,
         "category": "crypto"
     },
-    # وكالات عامة (للأخبار المؤثرة)
-    "Reuters Tech": {
-        "url": "https://www.reuters.com/technology/rss",
-        "priority": 10,
-        "category": "general"
+    "The Block": {
+        "url": "https://www.theblock.co/rss.xml?format=xml",
+        "priority": 9,
+        "category": "crypto"
+    },
+    "Bitcoinist": {
+        "url": "https://bitcoinist.com/feed/",
+        "priority": 7,
+        "category": "crypto"
+    },
+    "CryptoSlate": {
+        "url": "https://cryptoslate.com/feed/",
+        "priority": 7,
+        "category": "crypto"
     },
 }
 
@@ -65,26 +57,18 @@ RSS_SOURCES = {
 # 🔍 كلمات التصفية الأولية
 # ══════════════════════════════════════════════════════════
 
-# الكلمات التي يجب أن يحتويها الخبر للمرور
 FILTER_KEYWORDS = [
-    # عملات
     "bitcoin", "btc", "ethereum", "eth", "solana", "sol",
     "bnb", "xrp", "cardano", "ada", "dogecoin", "doge",
     "ripple", "polygon", "matic", "avalanche", "avax",
     "polkadot", "dot", "chainlink", "link", "litecoin", "ltc",
     "crypto", "cryptocurrency", "blockchain", "defi", "nft",
-    
-    # جهات تنظيمية
     "sec", "cftc", "federal reserve", "fed", "us treasury",
     "el salvador", "binance", "coinbase", "ripple labs",
-    
-    # أحداث مهمة
     "hack", "exploit", "breach", "lawsuit", "regulation",
     "ban", "approve", "etf", "halving", "fork", "upgrade",
     "emergency", "crash", "pump", "dump", "bull", "bear",
     "inflation", "interest rate", "fomc", "powell",
-    
-    # تقنية
     "smart contract", "layer 2", "l2", "rollup", "bridge",
     "staking", "mining", "token burn", "airdrop",
 ]
@@ -152,7 +136,6 @@ NEGATIVE_WORDS = [
 # ⭐ إعدادات تقييم الأهمية
 # ══════════════════════════════════════════════════════════
 
-# كلمات تزيد الأهمية بقوة
 HIGH_IMPACT_WORDS = [
     "emergency", "flash crash", "sec approves", "sec rejects",
     "etf approved", "ban", "hack", "exploit", "breach",
@@ -160,7 +143,6 @@ HIGH_IMPACT_WORDS = [
     "halving", "fork", "china ban", "el salvador",
 ]
 
-# عتبة الأهمية للإرسال (فقط الأخبار ≥ هذا الرقم تُرسل)
 MIN_IMPORTANCE_TO_SEND = 7
 
 # ══════════════════════════════════════════════════════════
@@ -168,47 +150,27 @@ MIN_IMPORTANCE_TO_SEND = 7
 # ══════════════════════════════════════════════════════════
 
 CRYPTO_MAP = {
-    #BTC
     "bitcoin": "BTC", "btc": "BTC",
-    # ETH
     "ethereum": "ETH", "eth": "ETH",
-    # SOL
     "solana": "SOL", "sol": "SOL",
-    # BNB
     "binance coin": "BNB", "bnb": "BNB",
-    # XRP
     "ripple": "XRP", "xrp": "XRP",
-    # ADA
     "cardano": "ADA", "ada": "ADA",
-    # DOGE
     "dogecoin": "DOGE", "doge": "DOGE",
-    # DOT
     "polkadot": "DOT", "dot": "DOT",
-    # LINK
     "chainlink": "LINK", "link": "LINK",
-    # LTC
     "litecoin": "LTC", "ltc": "LTC",
-    # MATIC/POL
     "polygon": "POL", "matic": "POL", "pol": "POL",
-    # AVAX
     "avalanche": "AVAX", "avax": "AVAX",
-    # UNI
     "uniswap": "UNI", "uni": "UNI",
-    # ATOM
     "cosmos": "ATOM", "atom": "ATOM",
-    # NEAR
     "near protocol": "NEAR", "near": "NEAR",
-    # APT
     "aptos": "APT", "apt": "APT",
-    # SUI
     "sui": "SUI",
-    # ARB
     "arbitrum": "ARB", "arb": "ARB",
-    # OP
     "optimism": "OP", "op": "OP",
 }
 
-# رموز العملات (للعرض)
 CRYPTO_EMOJIS = {
     "BTC": "₿", "ETH": "⟠", "SOL": "◎", "BNB": "🔶",
     "XRP": "✕", "ADA": "🔵", "DOGE": "🐕", "DOT": "⬡",
@@ -221,17 +183,8 @@ CRYPTO_EMOJIS = {
 # ⚙️ إعدادات عامة
 # ══════════════════════════════════════════════════════════
 
-# فترة الفحص (بالثواني)
 CHECK_INTERVAL = 60
-
-# مهلة طلبات HTTP (بالثواني)
 REQUEST_TIMEOUT = 15
-
-# الحد الأقصى للأخبار المرسلة في المرة الواحدة
 MAX_NEWS_PER_CHECK = 5
-
-# ملف تخزين الأخبار المرسلة
 SENT_NEWS_FILE = "sent_news.json"
-
-# منفذ خادم الويب الوهمي
 KEEP_ALIVE_PORT = 5000
