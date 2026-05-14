@@ -1,12 +1,11 @@
 """
 ═══════════════════════════════════════════════════════════
-   البوت الرئيسي - Crypto Whale Bot (Webhook)
+   البوت الرئيسي - Crypto Whale Bot
 ═══════════════════════════════════════════════════════════
 """
 
 import logging
 import asyncio
-import os
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -14,6 +13,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
 )
+
 from config import (
     BOT_TOKEN,
     CHAT_ID,
@@ -31,8 +31,6 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
-PORT = int(os.environ.get('PORT', 5000))
 
 
 def format_news_message(analysis: dict, signal: dict) -> str:
@@ -158,7 +156,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 ✅ تم تفعيل الفحص التلقائي
 🔄 فحص كل دقيقة
-⭐ إرسال الأخبار المهمة فقط
+⭐ إرسال الأخبار المهمة فقط (أهمية ≥ 8)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 أرسل /help لعرض الأوامر
@@ -303,7 +301,8 @@ async def error_handler(update, context):
 
 
 def main():
-    logger.info("🐋 بدء تشغيل البوت (Webhook)...")
+    """تشغيل البوت"""
+    logger.info("🐋 بدء تشغيل بوت الأخبار التحليلي...")
     
     app = Application.builder().token(BOT_TOKEN).build()
     
@@ -318,7 +317,6 @@ def main():
     app.add_handler(CommandHandler("stop", stop_command))
     app.add_handler(CommandHandler("help", help_command))
     
-    # بدء الفحص التلقائي
     app.job_queue.run_repeating(
         check_news_job,
         interval=CHECK_INTERVAL,
@@ -328,13 +326,11 @@ def main():
     logger.info("✅ تم بدء الفحص التلقائي")
     
     logger.info("🚀 البوت جاهز!")
-    
-    # تشغيل بالـ Webhook بدل Polling (لا يسبب تعارض!)
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=BOT_TOKEN,
-        webhook_url=f"https://crypto-whale-bot.onrender.com/{BOT_TOKEN}"
+    app.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=["message"],
+        poll_interval=2,
+        timeout=10,
     )
 
 
