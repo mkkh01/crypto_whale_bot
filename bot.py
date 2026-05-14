@@ -90,14 +90,12 @@ async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
     try:
         logger.info("🔍 جاري فحص الأخبار...")
         
-        # 1. جلب الأخبار
         all_news = fetcher.fetch_all()
         
         if not all_news:
             logger.info("📭 لا توجد أخبار من المصادر")
             return "no_news"
         
-        # 2. تصفية الأخبار المرسلة مسبقاً
         new_news = [n for n in all_news if not storage.is_sent(n["id"])]
         
         if not new_news:
@@ -106,7 +104,6 @@ async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
         
         logger.info(f"📰 تم العثور على {len(new_news)} أخبار جديدة")
         
-        # 3. تحليل وإرسال الأخبار المهمة
         sent_count = 0
         skipped_count = 0
         
@@ -114,28 +111,22 @@ async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
             if sent_count >= MAX_NEWS_PER_CHECK:
                 break
             
-            # تحليل الخبر
             analysis = analyzer.analyze(news)
             
-            # التحقق من الأهمية
             if analysis["importance"] < MIN_IMPORTANCE_TO_SEND:
                 storage.mark_as_sent(news["id"])
                 skipped_count += 1
                 continue
             
-            # توليد الإشارة
             signal = signal_generator.generate(analysis)
             
-            # تنسيق الرسالة
             message = format_news_message(analysis, signal)
             
-            # إضافة زر
             keyboard = [
                 [InlineKeyboardButton("🔗 قراءة المزيد", url=analysis["link"])]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            # إرسال الرسالة
             try:
                 await context.bot.send_message(
                     chat_id=CHAT_ID,
@@ -149,10 +140,7 @@ async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"❌ خطأ في الإرسال: {e}")
             
-            # وضع علامة كمرسل
             storage.mark_as_sent(news["id"])
-            
-            # انتظار قصير بين الرسائل
             await asyncio.sleep(1)
         
         logger.info(f"📤 تم إرسال {sent_count} | تم تخطي {skipped_count}")
@@ -186,7 +174,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 أرسل /help لعرض الأوامر
 """
     
-    # بدء الفحص التلقائي
     try:
         if context.job_queue:
             existing_jobs = context.job_queue.get_jobs_by_name("news_check")
@@ -334,7 +321,7 @@ async def force_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = await check_news_job(context)
         
         if result == "no_news":
-            await wait_msg.edit_text("📭 لا توجد أخبار من المصادر حالياً\n\n💡 قد تكون المواقع ترفض الطلبات من السيرفر المجاني")
+            await wait_msg.edit_text("📭 لا توجد أخبار من المصادر حالياً")
         elif result == "all_sent":
             await wait_msg.edit_text("📭 جميع الأخبار الحالية تم إرسالها مسبقاً\n\n💡 أرسل /reset لمسح المحفوظات")
         elif result.startswith("sent:"):
@@ -402,7 +389,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 💡 الفحص التلقائي كل دقيقة
-⭐ إرسال أهمية ≥ 7 فقط
+⭐ إرسال أهمية ≥ 4 فقط
 """
     await update.message.reply_text(message, parse_mode="Markdown")
 
@@ -412,21 +399,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ══════════════════════════════════════════════════════════
 
 async def post_init(application):
-    """تشغيل بعد تهيئة البوت - يحل مشكلة التعارض"""
+    """تشغيل بعد تهيئة البوت"""
     try:
         await application.bot.delete_webhook(drop_pending_updates=True)
         logger.info("✅ تم حذف Webhook القديم")
     except Exception as e:
         logger.warning(f"⚠️ خطأ في حذف Webhook: {e}")
-    await asyncio.sleep(3)
+    await asyncio.sleep(5)
     logger.info("✅ جاهز للعمل")
 
 
 async def error_handler(update, context):
-    """معالج الأخطاء - يمنع الانهيار"""
+    """معالج الأخطاء"""
     error = context.error
     if "Conflict" in str(error):
-        logger.warning("⚠️ تعارض - سيتجاهل تلقائياً")
         return
     logger.error(f"❌ خطأ: {error}")
 
@@ -439,13 +425,10 @@ def main():
     """تشغيل البوت"""
     logger.info("🐋 بدء تشغيل بوت الأخبار التحليلي...")
     
-    # إنشاء التطبيق مع post_init
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     
-    # إضافة معالج أخطاء
     app.add_error_handler(error_handler)
     
-    # إضافة معالجات الأوامر
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("price", price_command))
@@ -455,11 +438,14 @@ def main():
     app.add_handler(CommandHandler("stop", stop_command))
     app.add_handler(CommandHandler("help", help_command))
     
-    # بدء البوت
     logger.info("🚀 البوت جاهز!")
+    
     app.run_polling(
         drop_pending_updates=True,
-        allowed_updates=["message"]
+        allowed_updates=["message"],
+        cleanup_interval=10,
+        poll_interval=2,
+        timeout=10,
     )
 
 
