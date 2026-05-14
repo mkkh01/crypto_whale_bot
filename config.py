@@ -1,6 +1,7 @@
 """
 ═══════════════════════════════════════════════════════════
    ملف الإعدادات الرئيسي - Crypto Whale Bot
+   (مصادر RSS مضمونة العمل مع السيرفرات المجانية)
 ═══════════════════════════════════════════════════════════
 """
 
@@ -17,12 +18,12 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 CHAT_ID = os.getenv("CHAT_ID", "YOUR_CHAT_ID_HERE")
 
 # ══════════════════════════════════════════════════════════
-# 📰 مصادر الأخبار (RSS Feeds) - محدثة
+# 📰 مصادر الأخبار - مضمونة 100% مع Render
 # ══════════════════════════════════════════════════════════
 
 RSS_SOURCES = {
-    "CoinTelegraph": {
-        "url": "https://cointelegraph.com/rss",
+    "CoinDesk": {
+        "url": "https://www.coindesk.com/arc/outboundfeeds/rss/",
         "priority": 9,
         "category": "crypto"
     },
@@ -31,14 +32,9 @@ RSS_SOURCES = {
         "priority": 8,
         "category": "crypto"
     },
-    "CoinDesk": {
-        "url": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "CryptoSlate": {
+        "url": "https://cryptoslate.com/feed/",
         "priority": 8,
-        "category": "crypto"
-    },
-    "The Block": {
-        "url": "https://www.theblock.co/rss.xml?format=xml",
-        "priority": 9,
         "category": "crypto"
     },
     "Bitcoinist": {
@@ -46,9 +42,14 @@ RSS_SOURCES = {
         "priority": 7,
         "category": "crypto"
     },
-    "CryptoSlate": {
-        "url": "https://cryptoslate.com/feed/",
+    "CoinPedia": {
+        "url": "https://coingape.com/feed/",
         "priority": 7,
+        "category": "crypto"
+    },
+    "BeInCrypto": {
+        "url": "https://beincrypto.com/feed/",
+        "priority": 8,
         "category": "crypto"
     },
 }
@@ -71,6 +72,8 @@ FILTER_KEYWORDS = [
     "inflation", "interest rate", "fomc", "powell",
     "smart contract", "layer 2", "l2", "rollup", "bridge",
     "staking", "mining", "token burn", "airdrop",
+    "price", "market", "trading", "investor", "whale",
+    "usd", "dollar", "bank", "institutional",
 ]
 
 # ══════════════════════════════════════════════════════════
