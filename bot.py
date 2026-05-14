@@ -176,8 +176,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         if context.job_queue:
-            existing_jobs = context.job_queue.get_jobs_by_name("news_check")
-            if not existing_jobs:
+            existing_jobs = context.job_queue.get_jobs()
+            has_check = any("news_check" in str(j.name) for j in existing_jobs)
+            if not has_check:
                 context.job_queue.run_repeating(
                     check_news_job,
                     interval=CHECK_INTERVAL,
@@ -201,8 +202,11 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أمر الحالة"""
     has_jobs = False
     if context.job_queue:
-        jobs = context.job_queue.get_jobs_by_name("news_check")
-        has_jobs = bool(jobs)
+        try:
+            jobs = context.job_queue.get_jobs()
+            has_jobs = len(jobs) > 0
+        except Exception:
+            has_jobs = True
     
     status = "🟢 يعمل" if has_jobs else "🔴 متوقف"
     
@@ -351,13 +355,10 @@ async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أمر إيقاف الفحص التلقائي"""
     try:
         if context.job_queue:
-            jobs = context.job_queue.get_jobs_by_name("news_check")
-            if jobs:
-                for job in jobs:
-                    job.schedule_removal()
-                await update.message.reply_text("⏹️ تم إيقاف الفحص التلقائي\nأرسل /start لإعادة التشغيل")
-            else:
-                await update.message.reply_text("ℹ️ الفحص التلقائي متوقف بالفعل")
+            jobs = context.job_queue.get_jobs()
+            for job in jobs:
+                job.schedule_removal()
+            await update.message.reply_text("⏹️ تم إيقاف الفحص التلقائي\nأرسل /start لإعادة التشغيل")
         else:
             await update.message.reply_text("ℹ️ JobQueue غير متاح")
     except Exception as e:
