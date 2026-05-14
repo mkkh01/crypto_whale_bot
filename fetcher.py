@@ -1,10 +1,11 @@
 """
 ═══════════════════════════════════════════════════════════
-   وحدة جلب الأخبار - عبر خدمة rss2json
+   وحدة جلب الأخبار - محسنة لتجنب 429
 ═══════════════════════════════════════════════════════════
 """
 
 import hashlib
+import asyncio
 import requests
 from typing import List, Dict
 from config import RSS_SOURCES, REQUEST_TIMEOUT
@@ -12,7 +13,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-RSS2JSON = "https://api.rss2json.com/v1/api.json"
+# خدمتين بديلتين لتبديل بينهما عند تجاوز limit
+RSS_SERVICES = [
+    "https://api.rss2json.com/v1/api.json",
+    "https://api.allorigins.win/raw?url=",
+]
 
 
 class NewsFetcher:
@@ -29,29 +34,70 @@ class NewsFetcher:
         clean = re.sub(r'&[^;]+;', ' ', clean)
         return clean[:300].strip()
     
-    def fetch_source(self, name: str, info: Dict) -> List[Dict]:
+    def _fetch_via_rss2json(self, url: str) -> List[Dict]:
+        """الطريقة الأولى: rss2json"""
+        try:
+            resp = self.session.get(
+                "https://api.rss2json.com/v1/api.json",
+                params={"rss_url": url},
+                timeout=REQUEST_TIMEOUT
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("status") == "ok":
+                    return data.get("items", [])
+        except:
+            pass
+        return []
+    
+    def _fetch_via_allorigins(self, url: str) -> List[Dict]:
+        """الطريقة الثانية: allorigins (بديل)"""
+        try:
+            import xml.etree.ElementTree as ET
+            resp = self.session.get(
+                "https://api.allorigins.win/raw",
+                params={"url": url},
+                timeout=REQUEST_TIMEOUT
+            )
+            if resp.status_code == 200:
+                root = ET.fromstring(resp.text)
+                items = root.findall('.//item')
+                result = []
+                for item in items[:10]:
+                    title = item.findtext('title', '')
+                    link = item.findtext('link', '')
+                    desc = item.findtext('description', '')
+                    pub_date = item.findtext('pubDate', '')
+                    if title and link:
+                        result.append({
+                            "title": title.strip(),
+                            "link": link.strip(),
+                            "description": self._clean(desc) if desc else "",
+                            "pubDate": pub_date,
+                        })
+                return result
+        except:
+            pass
+        return []
+    
+    async def fetch_source(self, name: str, info: Dict) -> List[Dict]:
         news_list = []
+        url = info["url"]
         
         try:
             logger.info(f"🔗 جاري جلب: {name}...")
             
-            resp = self.session.get(
-                RSS2JSON,
-                params={"rss_url": info["url"]},
-                timeout=REQUEST_TIMEOUT
-            )
+            # المحاولة الأولى
+            items = self._fetch_via_rss2json(url)
             
-            if resp.status_code != 200:
-                logger.warning(f"⚠️ {name}: رمز {resp.status_code}")
+            # إذا فشلت، المحاولة الثانية
+            if not items:
+                items = self._fetch_via_allorigins(url)
+            
+            if not items:
+                logger.warning(f"⚠️ {name}: لا توجد بيانات")
                 return news_list
             
-            data = resp.json()
-            
-            if data.get("status") != "ok":
-                logger.warning(f"⚠️ {name}: rss2json خطأ")
-                return news_list
-            
-            items = data.get("items", [])
             logger.info(f"📥 {name}: {len(items)} عنصر")
             
             for item in items:
@@ -72,24 +118,22 @@ class NewsFetcher:
                         "source_category": info.get("category", "general"),
                     })
             
-            # تسجيل أول عنوان
             if news_list:
-                logger.info(f"   📰 {news_list[0]['title'][:80]}")
+                logger.info(f"✅ {name}: {len(news_list)} خبر")
             
-            logger.info(f"✅ {name}: {len(news_list)} خبر")
+            # انتظار ثانيتين بين كل مصدر لتجنب 429
+            await asyncio.sleep(2)
             
-        except requests.exceptions.Timeout:
-            logger.warning(f"⏱️ انتهت مهلة {name}")
         except Exception as e:
             logger.warning(f"⚠️ خطأ {name}: {e}")
         
         return news_list
     
-    def fetch_all(self) -> List[Dict]:
+    async def fetch_all(self) -> List[Dict]:
         all_news = []
         
         for name, info in RSS_SOURCES.items():
-            news = self.fetch_source(name, info)
+            news = await self.fetch_source(name, info)
             all_news.extend(news)
         
         all_news.sort(key=lambda x: (-x["source_priority"], x["source"]))
