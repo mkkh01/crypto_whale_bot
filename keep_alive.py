@@ -1,7 +1,6 @@
 """
 ═══════════════════════════════════════════════════════════
-   خادم الويب الوهمي (يعمل في خيط ثانوي)
-   البوت يعمل في الخيط الرئيسي
+   خادم الويب الوهمي + البوت
 ═══════════════════════════════════════════════════════════
 """
 
@@ -29,8 +28,13 @@ def index():
     return "<h1>🐋 Crypto Whale Bot</h1><p>Running...</p>", 200
 
 
+@app.route('/<path:path>')
+def catch_all(path):
+    """يلتقط أي مسار آخر ويمنع 404"""
+    return "<h1>🐋 Crypto Whale Bot</h1><p>Running...</p>", 200
+
+
 def start_web_server():
-    """تشغيل خادم الويب في خيط منفصل"""
     app.run(
         host='0.0.0.0',
         port=KEEP_ALIVE_PORT,
@@ -40,11 +44,9 @@ def start_web_server():
 
 
 if __name__ == "__main__":
-    # تشغيل الويب في خيط ثانوي
     web_thread = threading.Thread(target=start_web_server, daemon=True)
     web_thread.start()
-    logger.info(f"✅ خادم Keep-Alive يعمل على المنفذ {KEEP_ALIVE_PORT}")
+    logger.info(f"✅ خادم Keep-Alive على المنفذ {KEEP_ALIVE_PORT}")
     
-    # تشغيل البوت في الخيط الرئيسي
     from bot import main
     main()
