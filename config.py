@@ -143,7 +143,7 @@ HIGH_IMPACT_WORDS = [
     "halving", "fork", "china ban", "el salvador",
 ]
 
-MIN_IMPORTANCE_TO_SEND = 7
+MIN_IMPORTANCE_TO_SEND = 4
 
 # ══════════════════════════════════════════════════════════
 # 🪙 خريطة العملات
