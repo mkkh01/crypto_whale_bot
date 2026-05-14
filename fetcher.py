@@ -1,6 +1,6 @@
 """
 ═══════════════════════════════════════════════════════════
-   وحدة جلب الأخبار - Fetcher (نسخة محسنة)
+   وحدة جلب الأخبار - Fetcher (بدون تصفية صارمة)
 ═══════════════════════════════════════════════════════════
 """
 
@@ -12,7 +12,6 @@ from datetime import datetime
 from typing import List, Dict
 from config import (
     RSS_SOURCES,
-    FILTER_KEYWORDS,
     REQUEST_TIMEOUT,
 )
 import logging
@@ -21,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 class NewsFetcher:
-    """فئة لجلب الأخبار من مصادر RSS"""
     
     def __init__(self):
         self.session = requests.Session()
@@ -32,12 +30,10 @@ class NewsFetcher:
         })
     
     def _generate_id(self, title: str, link: str) -> str:
-        """توليد معرف فريد للخبر"""
         unique_string = f"{title}:{link}"
         return hashlib.md5(unique_string.encode()).hexdigest()[:12]
     
     def _parse_rss(self, xml_content: str, source_name: str, source_info: Dict) -> List[Dict]:
-        """تحليل محتوى RSS واستخراج الأخبار"""
         news_list = []
         
         try:
@@ -47,9 +43,7 @@ class NewsFetcher:
             if not items:
                 items = root.findall('.//{http://www.w3.org/2005/Atom}entry')
             
-            logger.info(f"📊 {source_name}: عثر على {len(items)} عنصر")
-            
-            for item in items[:15]:
+            for item in items[:20]:
                 try:
                     title_elem = item.find('title') or item.find('{http://www.w3.org/2005/Atom}title')
                     title = title_elem.text if title_elem is not None else ""
@@ -92,22 +86,12 @@ class NewsFetcher:
         return news_list
     
     def _clean_html(self, text: str) -> str:
-        """إزالة أكواد HTML"""
         clean = re.sub(r'<[^>]+>', '', text)
         clean = re.sub(r'&[^;]+;', ' ', clean)
         clean = re.sub(r'\s+', ' ', clean).strip()
-        return clean[:200]
-    
-    def _passes_filter(self, title: str, description: str) -> bool:
-        """التحقق من التصفية الأولية"""
-        combined_text = (title + " " + description).lower()
-        for keyword in FILTER_KEYWORDS:
-            if keyword in combined_text:
-                return True
-        return False
+        return clean[:300]
     
     def fetch_from_source(self, source_name: str, source_info: Dict) -> List[Dict]:
-        """جلب الأخبار من مصدر واحد"""
         news_list = []
         url = source_info["url"]
         
@@ -120,13 +104,12 @@ class NewsFetcher:
             if response.status_code == 200:
                 raw_news = self._parse_rss(response.text, source_name, source_info)
                 
-                filtered = []
-                for news in raw_news:
-                    if self._passes_filter(news["title"], news["description"]):
-                        filtered.append(news)
+                # تسجيل أول 3 عناوين للمراقبة
+                for i, news in enumerate(raw_news[:3]):
+                    logger.info(f"   📰 [{source_name}] {news['title'][:80]}")
                 
-                logger.info(f"✅ {source_name}: {len(filtered)} خبر بعد التصفية")
-                news_list = filtered
+                logger.info(f"✅ {source_name}: {len(raw_news)} خبر")
+                news_list = raw_news
             else:
                 logger.warning(f"⚠️ {source_name}: رمز حالة {response.status_code}")
                 
@@ -140,7 +123,6 @@ class NewsFetcher:
         return news_list
     
     def fetch_all(self) -> List[Dict]:
-        """جلب الأخبار من جميع المصادر"""
         all_news = []
         
         for source_name, source_info in RSS_SOURCES.items():
