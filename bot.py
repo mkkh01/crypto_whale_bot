@@ -1,11 +1,12 @@
 """
 ═══════════════════════════════════════════════════════════
-   البوت الرئيسي - Crypto Whale Bot (نسخة نهائية)
+   البوت الرئيسي - Crypto Whale Bot (Webhook)
 ═══════════════════════════════════════════════════════════
 """
 
 import logging
 import asyncio
+import os
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -13,7 +14,6 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
 )
-
 from config import (
     BOT_TOKEN,
     CHAT_ID,
@@ -26,23 +26,16 @@ from analyzer import analyzer
 from signal_generator import signal_generator
 from storage import storage
 
-# ══════════════════════════════════════════════════════════
-# إعداد التسجيل (Logging)
-# ══════════════════════════════════════════════════════════
-
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
+PORT = int(os.environ.get('PORT', 5000))
 
-# ══════════════════════════════════════════════════════════
-# دوال تنسيق الرسائل
-# ══════════════════════════════════════════════════════════
 
 def format_news_message(analysis: dict, signal: dict) -> str:
-    """تنسيق رسالة الخبر"""
     message = f"""
 ┌─────────────────────────────────┐
 │   🐋 بوت الأخبار التحليلي      │
@@ -81,31 +74,23 @@ _{analysis['title_en']}_
     return message
 
 
-# ══════════════════════════════════════════════════════════
-# وظيفة الفحص (مركزية)
-# ══════════════════════════════════════════════════════════
-
 async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
-    """وظيفة فحص الأخبار"""
     try:
         logger.info("🔍 جاري فحص الأخبار...")
-        
         all_news = fetcher.fetch_all()
         
         if not all_news:
-            logger.info("📭 لا توجد أخبار من المصادر")
-            return "no_news"
+            logger.info("📭 لا توجد أخبار")
+            return
         
         new_news = [n for n in all_news if not storage.is_sent(n["id"])]
         
         if not new_news:
-            logger.info("📭 جميع الأخبار تم إرسالها مسبقاً")
-            return "all_sent"
+            logger.info("📭 جميع الأخبار مرسلة مسبقاً")
+            return
         
-        logger.info(f"📰 تم العثور على {len(new_news)} أخبار جديدة")
-        
+        logger.info(f"📰 {len(new_news)} أخبار جديدة")
         sent_count = 0
-        skipped_count = 0
         
         for news in new_news:
             if sent_count >= MAX_NEWS_PER_CHECK:
@@ -115,16 +100,12 @@ async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
             
             if analysis["importance"] < MIN_IMPORTANCE_TO_SEND:
                 storage.mark_as_sent(news["id"])
-                skipped_count += 1
                 continue
             
             signal = signal_generator.generate(analysis)
-            
             message = format_news_message(analysis, signal)
             
-            keyboard = [
-                [InlineKeyboardButton("🔗 قراءة المزيد", url=analysis["link"])]
-            ]
+            keyboard = [[InlineKeyboardButton("🔗 قراءة المزيد", url=analysis["link"])]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             try:
@@ -136,48 +117,26 @@ async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=reply_markup
                 )
                 sent_count += 1
-                logger.info(f"✅ تم إرسال: {analysis['title_en'][:50]}...")
+                logger.info(f"✅ تم الإرسال: {analysis['title_en'][:50]}")
             except Exception as e:
-                logger.error(f"❌ خطأ في الإرسال: {e}")
+                logger.error(f"❌ خطأ الإرسال: {e}")
             
             storage.mark_as_sent(news["id"])
             await asyncio.sleep(1)
         
-        logger.info(f"📤 تم إرسال {sent_count} | تم تخطي {skipped_count}")
-        return f"sent:{sent_count}"
+        logger.info(f"📤 تم إرسال {sent_count}")
         
     except Exception as e:
-        logger.error(f"❌ خطأ في فحص الأخبار: {e}")
-        return f"error:{str(e)[:30]}"
+        logger.error(f"❌ خطأ الفحص: {e}")
 
-
-# ══════════════════════════════════════════════════════════
-# معالجات الأوامر
-# ══════════════════════════════════════════════════════════
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر البدء"""
     chat_id = update.effective_chat.id
-    
-    welcome = """
-┌─────────────────────────────────┐
-│   🐋 مرحباً بك!               │
-└─────────────────────────────────┘
-
-بوت الأخبار التحليلي للعملات الرقمية
-
-✅ تم تفعيل الفحص التلقائي
-🔄 سيتم فحص الأخبار كل دقيقة
-⭐ سيتم إرسال الأخبار المهمة فقط
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-أرسل /help لعرض الأوامر
-"""
     
     try:
         if context.job_queue:
-            existing_jobs = context.job_queue.get_jobs()
-            has_check = any("news_check" in str(j.name) for j in existing_jobs)
+            jobs = context.job_queue.get_jobs()
+            has_check = any("news_check" in str(j.name) for j in jobs)
             if not has_check:
                 context.job_queue.run_repeating(
                     check_news_job,
@@ -186,31 +145,39 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     name="news_check"
                 )
                 logger.info("✅ تم بدء الفحص التلقائي")
-        else:
-            logger.warning("⚠️ JobQueue غير متاح")
     except Exception as e:
-        logger.error(f"❌ خطأ في بدء الفحص التلقائي: {e}")
+        logger.error(f"❌ خطأ: {e}")
     
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=welcome,
-        parse_mode="Markdown"
+    await update.message.reply_text(
+        """
+┌─────────────────────────────────┐
+│   🐋 مرحباً بك!               │
+└─────────────────────────────────┘
+
+بوت الأخبار التحليلي للعملات الرقمية
+
+✅ تم تفعيل الفحص التلقائي
+🔄 فحص كل دقيقة
+⭐ إرسال الأخبار المهمة فقط
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+أرسل /help لعرض الأوامر
+""", parse_mode="Markdown"
     )
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر الحالة"""
     has_jobs = False
     if context.job_queue:
         try:
             jobs = context.job_queue.get_jobs()
             has_jobs = len(jobs) > 0
-        except Exception:
+        except:
             has_jobs = True
     
     status = "🟢 يعمل" if has_jobs else "🔴 متوقف"
     
-    message = f"""
+    await update.message.reply_text(f"""
 ┌─────────────────────────────────┐
 │   📊 حالة البوت                │
 └─────────────────────────────────┘
@@ -220,213 +187,125 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🔄 فترة الفحص: كل {CHECK_INTERVAL} ثانية
 ⭐ عتبة الإرسال: أهمية ≥ {MIN_IMPORTANCE_TO_SEND}
 📝 أخبار محفوظة: {storage.get_count()}
-"""
-    await update.message.reply_text(message, parse_mode="Markdown")
+""", parse_mode="Markdown")
 
 
 async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر سعر العملة"""
     if not context.args:
-        await update.message.reply_text(
-            "📝 الاستخدام: /price <رمز العملة>\n"
-            "مثال: /price BTC"
-        )
+        await update.message.reply_text("📝 الاستخدام: /price <رمز>\nمثال: /price BTC")
         return
     
     symbol = context.args[0].upper()
-    
     coin_map = {
         "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
         "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
         "DOGE": "dogecoin", "DOT": "polkadot", "LINK": "chainlink",
         "LTC": "litecoin", "POL": "matic-network", "AVAX": "avalanche-2",
         "UNI": "uniswap", "ATOM": "cosmos", "NEAR": "near",
-        "APT": "aptos", "SUI": "sui", "ARB": "arbitrum",
-        "OP": "optimism",
+        "APT": "aptos", "SUI": "sui", "ARB": "arbitrum", "OP": "optimism",
     }
     
     coin_id = coin_map.get(symbol)
     if not coin_id:
-        await update.message.reply_text(
-            f"❌ العملة {symbol} غير مدعومة\n\n"
-            "المدعومة: BTC ETH SOL BNB XRP ADA DOGE DOT LINK LTC POL AVAX"
-        )
+        await update.message.reply_text(f"❌ العملة {symbol} غير مدعومة")
         return
     
     wait_msg = await update.message.reply_text(f"⏳ جاري جلب سعر {symbol}...")
     
     try:
         import requests
-        
-        response = requests.get(
+        resp = requests.get(
             "https://api.coingecko.com/api/v3/simple/price",
-            params={
-                "ids": coin_id,
-                "vs_currencies": "usd",
-                "include_24hr_change": "true"
-            },
+            params={"ids": coin_id, "vs_currencies": "usd", "include_24hr_change": "true"},
             timeout=15
         )
-        
-        if response.status_code == 200:
-            data = response.json()
+        if resp.status_code == 200:
+            data = resp.json()
             if coin_id in data:
                 price = data[coin_id]["usd"]
                 change = data[coin_id].get("usd_24hr_change", 0)
-                change_emoji = "🟢" if change >= 0 else "🔴"
-                
-                message = f"""
+                emoji = "🟢" if change >= 0 else "🔴"
+                await wait_msg.edit_text(f"""
 ┌─────────────────────────────────┐
 │   💰 سعر {symbol}               │
 └─────────────────────────────────┘
 
 💵 السعر: ${price:,.2f}
-{change_emoji} تغير 24س: {change:+.2f}%
-🕐 الوقت: {datetime.now().strftime('%H:%M:%S')}
-"""
-                await wait_msg.edit_text(message, parse_mode="Markdown")
+{emoji} تغير 24س: {change:+.2f}%
+🕐 {datetime.now().strftime('%H:%M:%S')}
+""", parse_mode="Markdown")
             else:
-                await wait_msg.edit_text(f"❌ لم يتم العثور على بيانات {symbol}")
+                await wait_msg.edit_text(f"❌ لم يتم العثور على {symbol}")
         else:
-            await wait_msg.edit_text(f"❌ خطأ في جلب البيانات (رمز {response.status_code})")
-            
-    except requests.exceptions.Timeout:
-        await wait_msg.edit_text("❌ انتهت مهلة الاتصال، حاول لاحقاً")
+            await wait_msg.edit_text(f"❌ خطأ (رمز {resp.status_code})")
     except Exception as e:
         await wait_msg.edit_text(f"❌ خطأ: {str(e)[:50]}")
 
 
 async def watchlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر قائمة المراقبة"""
-    message = """
+    await update.message.reply_text("""
 ┌─────────────────────────────────┐
 │   👁️ قائمة المراقبة            │
 └─────────────────────────────────┘
 
-العملات الرئيسية:
 ₿ BTC | ⟠ ETH | ◎ SOL | 🔶 BNB
 ✕ XRP | 🔵 ADA | 🐕 DOGE | ⬡ DOT
-
-العملات الثانوية:
 ⬡ LINK | Ł LTC | 🟣 POL | 🔺 AVAX
-🦄 UNI | ⚛️ ATOM | 🔵 NEAR | 🟢 APT
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 يتم مراقبة الأخبار تلقائياً
-"""
-    await update.message.reply_text(message, parse_mode="Markdown")
+""", parse_mode="Markdown")
 
 
 async def force_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر الفحص اليدوي"""
-    wait_msg = await update.message.reply_text("🔄 جاري الفحص اليدوي...")
-    
+    wait_msg = await update.message.reply_text("🔄 جاري الفحص...")
     try:
-        result = await check_news_job(context)
-        
-        if result == "no_news":
-            await wait_msg.edit_text("📭 لا توجد أخبار من المصادر حالياً")
-        elif result == "all_sent":
-            await wait_msg.edit_text("📭 جميع الأخبار الحالية تم إرسالها مسبقاً\n\n💡 أرسل /reset لمسح المحفوظات")
-        elif result.startswith("sent:"):
-            count = result.split(":")[1]
-            await wait_msg.edit_text(f"✅ تم إرسال {count} أخبار جديدة")
-        elif result.startswith("error:"):
-            err = result.split(":")[1]
-            await wait_msg.edit_text(f"❌ خطأ: {err}")
-        else:
-            await wait_msg.edit_text("📭 لا توجد أخبار مهمة الآن")
-            
+        await check_news_job(context)
+        await wait_msg.edit_text("✅ تم الفحص")
     except Exception as e:
         await wait_msg.edit_text(f"❌ خطأ: {str(e)[:50]}")
-        logger.error(f"❌ خطأ في الفحص اليدوي: {e}")
 
 
 async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر مسح الأخبار المحفوظة"""
     count = storage.clear_all()
-    await update.message.reply_text(
-        f"✅ تم مسح {count} خبر محفوظ\n"
-        "🔄 أرسل /force لفحص فوري"
-    )
+    await update.message.reply_text(f"✅ تم مسح {count} خبر\n🔄 أرسل /force")
 
 
 async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر إيقاف الفحص التلقائي"""
     try:
         if context.job_queue:
-            jobs = context.job_queue.get_jobs()
-            for job in jobs:
+            for job in context.job_queue.get_jobs():
                 job.schedule_removal()
-            await update.message.reply_text("⏹️ تم إيقاف الفحص التلقائي\nأرسل /start لإعادة التشغيل")
-        else:
-            await update.message.reply_text("ℹ️ JobQueue غير متاح")
-    except Exception as e:
-        await update.message.reply_text(f"❌ خطأ: {str(e)[:30]}")
+            await update.message.reply_text("⏹️ تم الإيقاف\nأرسل /start للتشغيل")
+    except:
+        await update.message.reply_text("❌ خطأ")
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر المساعدة"""
-    message = """
+    await update.message.reply_text("""
 ┌─────────────────────────────────┐
 │   📖 دليل الاستخدام             │
 └─────────────────────────────────┘
 
-الأوامر الأساسية:
-├─ /start - تشغيل البوت
-├─ /status - حالة البوت
-├─ /stop - إيقاف الفحص
-└─ /help - هذه المساعدة
-
-أوامر الأسعار:
-├─ /price BTC - سعر بيتكوين
-├─ /price ETH - سعر إيثريوم
-└─ /price <رمز> - أي عملة
-
-أوامر متقدمة:
-├─ /force - فحص يدوي فوري
+├─ /start - تشغيل
+├─ /status - الحالة
+├─ /stop - إيقاف
+├─ /help - المساعدة
+├─ /price BTC - السعر
+├─ /force - فحص يدوي
 ├─ /reset - مسح المحفوظات
-└─ /watchlist - قائمة المراقبة
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 الفحص التلقائي كل دقيقة
-⭐ إرسال أهمية ≥ 4 فقط
-"""
-    await update.message.reply_text(message, parse_mode="Markdown")
-
-
-# ══════════════════════════════════════════════════════════
-# دوال ما بعد التهيئة ومعالجة الأخطاء
-# ══════════════════════════════════════════════════════════
-
-async def post_init(application):
-    """تشغيل بعد تهيئة البوت"""
-    try:
-        await application.bot.delete_webhook(drop_pending_updates=True)
-        logger.info("✅ تم حذف Webhook القديم")
-    except Exception as e:
-        logger.warning(f"⚠️ خطأ في حذف Webhook: {e}")
-    await asyncio.sleep(5)
-    logger.info("✅ جاهز للعمل")
+└─ /watchlist - المراقبة
+""", parse_mode="Markdown")
 
 
 async def error_handler(update, context):
-    """معالج الأخطاء"""
     error = context.error
-    if "Conflict" in str(error):
+    if "Conflict" in str(error) or "timed out" in str(error):
         return
     logger.error(f"❌ خطأ: {error}")
 
 
-# ══════════════════════════════════════════════════════════
-# نقطة الدخول الرئيسية
-# ══════════════════════════════════════════════════════════
-
 def main():
-    """تشغيل البوت"""
-    logger.info("🐋 بدء تشغيل بوت الأخبار التحليلي...")
+    logger.info("🐋 بدء تشغيل البوت (Webhook)...")
     
-    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    app = Application.builder().token(BOT_TOKEN).build()
     
     app.add_error_handler(error_handler)
     
@@ -439,12 +318,23 @@ def main():
     app.add_handler(CommandHandler("stop", stop_command))
     app.add_handler(CommandHandler("help", help_command))
     
+    # بدء الفحص التلقائي
+    app.job_queue.run_repeating(
+        check_news_job,
+        interval=CHECK_INTERVAL,
+        first=10,
+        name="news_check"
+    )
+    logger.info("✅ تم بدء الفحص التلقائي")
+    
     logger.info("🚀 البوت جاهز!")
-    app.run_polling(
-        drop_pending_updates=True,
-        allowed_updates=["message"],
-        poll_interval=2,
-        timeout=10,
+    
+    # تشغيل بالـ Webhook بدل Polling (لا يسبب تعارض!)
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=BOT_TOKEN,
+        webhook_url=f"https://crypto-whale-bot.onrender.com/{BOT_TOKEN}"
     )
 
 
