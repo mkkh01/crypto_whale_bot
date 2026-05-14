@@ -75,7 +75,7 @@ _{analysis['title_en']}_
 async def check_news_job(context: ContextTypes.DEFAULT_TYPE):
     try:
         logger.info("🔍 جاري فحص الأخبار...")
-        all_news = fetcher.fetch_all()
+        all_news = await fetcher.fetch_all()
         
         if not all_news:
             logger.info("📭 لا توجد أخبار")
@@ -147,7 +147,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ خطأ: {e}")
     
     await update.message.reply_text(
-        """
+        f"""
 ┌─────────────────────────────────┐
 │   🐋 مرحباً بك!               │
 └─────────────────────────────────┘
@@ -156,7 +156,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 ✅ تم تفعيل الفحص التلقائي
 🔄 فحص كل دقيقة
-⭐ إرسال الأخبار المهمة فقط (أهمية ≥ 8)
+⭐ إرسال الأخبار المهمة فقط (أهمية ≥ {MIN_IMPORTANCE_TO_SEND})
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 أرسل /help لعرض الأوامر
