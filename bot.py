@@ -439,11 +439,9 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     
     logger.info("🚀 البوت جاهز!")
-    
     app.run_polling(
         drop_pending_updates=True,
         allowed_updates=["message"],
-        cleanup_interval=10,
         poll_interval=2,
         timeout=10,
     )
