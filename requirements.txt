@@ -4,3 +4,4 @@ feedparser
 Flask
 python-dotenv
 pytz
+deep-translator
