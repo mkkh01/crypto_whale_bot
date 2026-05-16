@@ -1,12 +1,13 @@
 """
 ═══════════════════════════════════════════════════════════
-   وحدة التحليل - Analyzer (قاموس أبسط محسّن)
+   وحدة التحليل - Analyzer (مترجم جوجل التلقائي الذكي)
 ═══════════════════════════════════════════════════════════
 """
 
 import re
 import logging
 from typing import Dict, List, Tuple
+from deep_translator import GoogleTranslator  # استيراد مترجم جوجل المجاني
 from config import (
     CATEGORY_KEYWORDS,
     POSITIVE_WORDS,
@@ -102,195 +103,15 @@ class NewsAnalyzer:
         return min(importance, 10)
     
     def translate_title_ar(self, title: str) -> str:
-        """ترجمة أبسط محسّن"""
-        words = title.replace('-', ' ').replace('|', ' ').replace(':', ' ').replace('"', '').replace("'", "").split()
-        
-        word_map = {
-            # عملات
-            "bitcoin": "بيتكوين", "ethereum": "إيثريوم", "solana": "سولانا",
-            "binance": "بينانس", "coinbase": "كوينبيس", "ripple": "ريبل",
-            "cardano": "كاردانو", "dogecoin": "دوجكوين",
-            "polkadot": "بولكادوت", "chainlink": "شينلينك",
-            "litecoin": "لايتكوين", "polygon": "بوليجون",
-            "avalanche": "أفالانش", "uniswap": "يونيسواب",
-            "sec": "هيئة الأوراق المالية", "fed": "الفيدرالي",
-            
-            # أحداث وأفعال
-            "dips": "ينخفض", "dip": "ينخفض",
-            "surges": "ارتفاع حاد", "surge": "ارتفاع حاد",
-            "soars": "يقفز", "soar": "قفزة",
-            "drops": "انخفاض", "drop": "انخفاض",
-            "plunges": "انهار", "plunge": "انهيار",
-            "crashes": "انهيار", "crash": "انهيار",
-            "pumps": "صعود مفاجئ", "pump": "صعود مفاجئ",
-            "dumps": "هبوط حاد", "dump": "هبوط",
-            "rallies": "تقدم", "rally": "تقدم",
-            "breaks": "يخترق",
-            "reaches": "يصل إلى",
-            "falls": "يسقط",
-            "rises": "يرتفع",
-            "climbs": "يتسلق",
-            "jumps": "يقفز",
-            "gains": "يربح",
-            "loses": "خاسر",
-            "expects": "يتوقع",
-            "confirms": "يؤكد",
-            "reveals": "يكشف",
-            "announces": "يعلن",
-            "warns": "يحذر",
-            "rejects": "يرفض",
-            "approves": "يوافق",
-            "banned": "ممنوع",
-            "launched": "أُطلق",
-            "listed": "إدراج",
-            "delisted": "إزالة من القائمة",
-            "surges": "ارتفاعات",
-            "trading": "تداول",
-            "investors": "المستثمرون",
-            "analyst": "محلل",
-            "price": "السعر",
-            "market": "السوق",
-            "below": "أقل من",
-            "above": "أعلى من",
-            "after": "بعد",
-            "despite": "رغم",
-            "without": "بدون",
-            "against": "ضد",
-            "between": "بين",
-            "according to": "وفقاً لـ",
-            "reported": "أُبلّغ عن",
-            "says": "يقول",
-            "will": "سوف",
-            "could": "يمكن",
-            "has": "لديه",
-            "was": "كان",
-            "is": "هو",
-            "are": "هم",
-            "been": "كان",
-            "with": "مع",
-            "from": "من",
-            "that": "أن",
-            "this": "هذا",
-            "which": "الذي",
-            "more": "المزيد من",
-            "also": "أيضاً",
-            "just": "فقط",
-            "not": "ليس",
-            "but": "لكن",
-            "very": "جداً",
-            "most": "معظم",
-            "some": "بعض",
-            "how": "كيف",
-            "why": "لماذا",
-            "what": "ماذا",
-            "when": "متى",
-            "where": "أين",
-            "who": "من",
-            "new": "جديد",
-            "first": "الأول",
-            "next": "التالي",
-            "another": "آخر",
-            "major": "كبير",
-            "high": "مرتفع",
-            "low": "منخفض",
-            "now": "الآن",
-            "today": "اليوم",
-            "week": "الأسبوع",
-            "month": "الشهر",
-            "year": "السنة",
-            "million": "مليون",
-            "billion": "مليار",
-            "trillion": "تريليون",
-            "percent": "بالمئة",
-            "levels": "مستويات",
-            "resistance": "مقاومة",
-            "support": "دعم",
-            "volume": "حجم التداول",
-            "whale": "حوت",
-            "institutional": "مؤسسي",
-            "retail": "تجزء",
-            "fear": "خوف",
-            "greed": "طمع",
-            "manipulation": "تلاعب",
-            "smart": "ذكي",
-            "contract": "عقد",
-            "layer": "طبقة",
-            "defi": "ديفاي",
-            "nft": "إن إف تي",
-            "etf": "صندوق متداول",
-            "halving": "تنصيف",
-            "regulation": "تنظيم",
-            "compliance": "امتثال",
-            "innovation": "ابتكار",
-            "technology": "تقنية",
-            "development": "تطوير",
-            "community": "مجتمع",
-            "ecosystem": "نظام بيئي",
-            "adoption": "اعتماد",
-            "integration": "دمج",
-            "partnership": "شراكة",
-            "milestone": "إنجاز",
-            "update": "تحديث",
-            "upgrade": "ترقية",
-            "release": "إصدار",
-            "version": "إصدار",
-            "hack": "اختراق",
-            "exploit": "ثغرة",
-            "security": "أمني",
-            "breach": "اختراق",
-            "vulnerability": "ثغرة أمنية",
-            "scam": "احتيال",
-            "fraud": "احتيال",
-            "theft": "سرقة",
-            "lawsuit": "دعوى قضائية",
-            "investigation": "تحقيق",
-            "fine": "غرامة",
-            "penalty": "عقوبة",
-            "warning": "تحذير",
-            "suspicious": "مشبوه",
-            "illegal": "غير قانوني",
-            "legal": "قانوني",
-            "bullish": "صعودي",
-            "bearish": "هبوطي",
-            "volatile": "متقلب",
-            "stable": "مستقر",
-            "profit": "ربح",
-            "loss": "خسارة",
-            "risk": "مخاطرة",
-            "opportunity": "فرصة",
-            "threat": "تهديد",
-            "challenge": "تحدي",
-            "solution": "حل",
-            "problem": "مشكلة",
-            "reason": "سبب",
-            "result": "نتيجة",
-            "impact": "تأثير",
-            "effect": "تأثير",
-            "cause": "سبب",
-            "concern": "قلق",
-            "crisis": "أزمة",
-            "recovery": "تعافي",
-            "decline": "انخفاض",
-            "growth": "نمو",
-            "improvement": "تحسين",
-            "setback": "تراجع",
-            "progress": "تقدم",
-            "success": "نجاح",
-            "failure": "فشل",
-        }
-        
-        translated = []
-        for word in words:
-            word_lower = word.lower().strip('.,!?()[]{}"\'')
-            clean_word = word.strip('.,!?()[]{}"\'')
-            if word_lower in word_map:
-                if word_map[word_lower]:
-                    translated.append(word_map[word_lower])
-            else:
-                translated.append(clean_word)
-        
-        result = " ".join(translated)
-        return result
+        """ترجمة ذكية وسياقية باستخدام خدمة مترجم جوجل التلقائية"""
+        try:
+            # تنظيف العنوان بشكل بسيط قبل الإرسال للمترجم لضمان دقة أعلى
+            clean_title = title.replace('|', ' - ').replace('  ', ' ').strip()
+            translated = GoogleTranslator(source='en', target='ar').translate(clean_title)
+            return translated
+        except Exception as e:
+            logger.error(f"⚠️ فشل الاتصال بمترجم جوجل، تم اعتماد العنوان الأصلي: {e}")
+            return title
     
     def analyze(self, news: Dict) -> Dict:
         full_text = news["title"] + " " + news.get("description", "")
