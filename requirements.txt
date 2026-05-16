@@ -1,6 +1,7 @@
-python-telegram-bot[job-queue,webhooks]
+python-telegram-bot[job-queue]
 requests
 feedparser
 Flask
 python-dotenv
 pytz
+googletrans==4.0.0rc1
